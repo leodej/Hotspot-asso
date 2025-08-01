@@ -66,7 +66,7 @@
         </div>
 
         <style>
-            .report-grid {
+            .reports-grid {
                 display: grid;
                 grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
                 gap: 1.5rem;
@@ -75,110 +75,180 @@
 
             .report-card {
                 background: white;
-                padding: 1.5rem;
                 border-radius: 8px;
+                padding: 1.5rem;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                border-left: 4px solid #3b82f6;
+                transition: transform 0.2s;
             }
 
+            .report-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+
+            .report-header {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            .report-icon {
+                width: 48px;
+                height: 48px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.5rem;
+                color: white;
+            }
+
+            .report-icon.usage { background: #3b82f6; }
+            .report-icon.financial { background: #10b981; }
+            .report-icon.performance { background: #f59e0b; }
+            .report-icon.security { background: #ef4444; }
+
             .report-title {
-                font-size: 1.1rem;
+                font-size: 1.25rem;
                 font-weight: 600;
-                margin-bottom: 0.5rem;
                 color: #1f2937;
+                margin-bottom: 0.25rem;
             }
 
             .report-description {
-                font-size: 0.875rem;
                 color: #6b7280;
-                margin-bottom: 1rem;
+                font-size: 0.875rem;
+            }
+
+            .report-actions {
+                display: flex;
+                gap: 0.5rem;
+                margin-top: 1rem;
             }
 
             .btn {
-                background: #3b82f6;
-                color: white;
-                border: none;
                 padding: 0.5rem 1rem;
                 border-radius: 6px;
-                cursor: pointer;
-                font-weight: 500;
-                transition: background-color 0.2s;
                 font-size: 0.875rem;
+                font-weight: 500;
                 text-decoration: none;
-                display: inline-block;
+                border: none;
+                cursor: pointer;
+                transition: background-color 0.2s;
             }
 
-            .btn:hover {
+            .btn-primary {
+                background: #3b82f6;
+                color: white;
+            }
+
+            .btn-primary:hover {
                 background: #2563eb;
             }
 
-            .coming-soon {
-                background: white;
-                padding: 3rem;
-                border-radius: 8px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                text-align: center;
-                color: #6b7280;
+            .btn-secondary {
+                background: #f3f4f6;
+                color: #374151;
             }
 
-            .coming-soon h3 {
-                color: #1f2937;
+            .btn-secondary:hover {
+                background: #e5e7eb;
+            }
+
+            .coming-soon {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                text-align: center;
+                padding: 3rem;
+                border-radius: 8px;
+                margin-top: 2rem;
+            }
+
+            .coming-soon h2 {
                 margin-bottom: 1rem;
+                font-size: 2rem;
+            }
+
+            .coming-soon p {
+                opacity: 0.9;
+                font-size: 1.125rem;
             }
         </style>
 
-        <!-- Cards de Relatórios -->
-        <div class="report-grid">
+        <!-- Reports Grid -->
+        <div class="reports-grid">
             <div class="report-card">
-                <div class="report-title">Relatório de Usuários</div>
-                <div class="report-description">
-                    Relatório completo de todos os usuários cadastrados no sistema, incluindo dados de acesso e uso.
+                <div class="report-header">
+                    <div class="report-icon usage">📊</div>
+                    <div>
+                        <div class="report-title">Relatório de Uso</div>
+                        <div class="report-description">Análise de consumo de dados por usuário</div>
+                    </div>
                 </div>
-                <button class="btn" onclick="generateReport('users')">Gerar Relatório</button>
+                <div class="report-actions">
+                    <button class="btn btn-primary" onclick="generateReport('usage')">Gerar Relatório</button>
+                    <button class="btn btn-secondary" onclick="scheduleReport('usage')">Agendar</button>
+                </div>
             </div>
 
             <div class="report-card">
-                <div class="report-title">Relatório de Créditos</div>
-                <div class="report-description">
-                    Análise detalhada do consumo de créditos por usuário e empresa, com gráficos de uso.
+                <div class="report-header">
+                    <div class="report-icon financial">💰</div>
+                    <div>
+                        <div class="report-title">Relatório Financeiro</div>
+                        <div class="report-description">Análise de créditos e faturamento</div>
+                    </div>
                 </div>
-                <button class="btn" onclick="generateReport('credits')">Gerar Relatório</button>
+                <div class="report-actions">
+                    <button class="btn btn-primary" onclick="generateReport('financial')">Gerar Relatório</button>
+                    <button class="btn btn-secondary" onclick="scheduleReport('financial')">Agendar</button>
+                </div>
             </div>
 
             <div class="report-card">
-                <div class="report-title">Relatório de Empresas</div>
-                <div class="report-description">
-                    Visão geral das empresas cadastradas, número de usuários e status de conexão.
+                <div class="report-header">
+                    <div class="report-icon performance">⚡</div>
+                    <div>
+                        <div class="report-title">Performance</div>
+                        <div class="report-description">Análise de performance da rede</div>
+                    </div>
                 </div>
-                <button class="btn" onclick="generateReport('companies')">Gerar Relatório</button>
+                <div class="report-actions">
+                    <button class="btn btn-primary" onclick="generateReport('performance')">Gerar Relatório</button>
+                    <button class="btn btn-secondary" onclick="scheduleReport('performance')">Agendar</button>
+                </div>
             </div>
 
             <div class="report-card">
-                <div class="report-title">Relatório de Perfis</div>
-                <div class="report-description">
-                    Análise dos perfis de acesso configurados e sua utilização pelos usuários.
+                <div class="report-header">
+                    <div class="report-icon security">🔒</div>
+                    <div>
+                        <div class="report-title">Segurança</div>
+                        <div class="report-description">Log de acessos e tentativas de login</div>
+                    </div>
                 </div>
-                <button class="btn" onclick="generateReport('profiles')">Gerar Relatório</button>
+                <div class="report-actions">
+                    <button class="btn btn-primary" onclick="generateReport('security')">Gerar Relatório</button>
+                    <button class="btn btn-secondary" onclick="scheduleReport('security')">Agendar</button>
+                </div>
             </div>
         </div>
 
-        <!-- Seção Em Desenvolvimento -->
+        <!-- Coming Soon Section -->
         <div class="coming-soon">
-            <h3>📊 Relatórios Avançados</h3>
-            <p>Os relatórios detalhados estão em desenvolvimento e estarão disponíveis em breve.</p>
-            <p>Funcionalidades que serão incluídas:</p>
-            <ul style="list-style: none; padding: 0; margin-top: 1rem;">
-                <li>• Gráficos de uso por período</li>
-                <li>• Exportação em PDF e Excel</li>
-                <li>• Relatórios personalizados</li>
-                <li>• Análise de tendências</li>
-                <li>• Alertas automáticos</li>
-            </ul>
+            <h2>🚧 Em Desenvolvimento</h2>
+            <p>Os relatórios detalhados estarão disponíveis em breve.<br>
+            Por enquanto, você pode visualizar as estatísticas no Dashboard.</p>
         </div>
 
         <script>
             function generateReport(type) {
-                alert('Relatório de ' + type + ' será gerado em breve!\n\nEsta funcionalidade está em desenvolvimento.');
+                alert(`Gerando relatório de ${type}... (Em desenvolvimento)`);
+            }
+
+            function scheduleReport(type) {
+                alert(`Agendando relatório de ${type}... (Em desenvolvimento)`);
             }
         </script>
     </main>

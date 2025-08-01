@@ -286,13 +286,32 @@ def users():
     finally:
         conn.close()
 
-@app.route('/companies')
+@app.route('/companies', methods=['GET', 'POST'])
 @login_required
 def companies():
     conn = get_db()
     if not conn:
         flash('Erro de conexão com banco de dados', 'error')
         return render_template('companies.html', companies=[], user={'name': session.get('name')})
+    
+    if request.method == 'POST':
+        try:
+            name = request.form['name']
+            mikrotik_ip = request.form['mikrotik_ip']
+            mikrotik_username = request.form['mikrotik_username']
+            mikrotik_password = request.form['mikrotik_password']
+            api_port = request.form.get('api_port', 8728)
+            
+            conn.execute('''
+                INSERT INTO companies (name, mikrotik_ip, mikrotik_username, mikrotik_password, api_port)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (name, mikrotik_ip, mikrotik_username, mikrotik_password, int(api_port)))
+            
+            conn.commit()
+            flash('Empresa cadastrada com sucesso!', 'success')
+            return redirect(url_for('companies'))
+        except Exception as e:
+            flash(f'Erro ao cadastrar empresa: {str(e)}', 'error')
     
     try:
         companies_list = conn.execute('''
@@ -309,13 +328,33 @@ def companies():
     finally:
         conn.close()
 
-@app.route('/profiles')
+@app.route('/profiles', methods=['GET', 'POST'])
 @login_required
 def profiles():
     conn = get_db()
     if not conn:
         flash('Erro de conexão com banco de dados', 'error')
         return render_template('profiles.html', profiles=[], companies=[], user={'name': session.get('name')})
+    
+    if request.method == 'POST':
+        try:
+            name = request.form['name']
+            company_id = request.form['company_id']
+            rate_limit = request.form['rate_limit']
+            session_timeout = request.form.get('session_timeout')
+            idle_timeout = request.form.get('idle_timeout')
+            shared_users = request.form.get('shared_users', 1)
+            
+            conn.execute('''
+                INSERT INTO hotspot_profiles (name, company_id, rate_limit, session_timeout, idle_timeout, shared_users)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (name, company_id, rate_limit, session_timeout, idle_timeout, int(shared_users)))
+            
+            conn.commit()
+            flash('Perfil cadastrado com sucesso!', 'success')
+            return redirect(url_for('profiles'))
+        except Exception as e:
+            flash(f'Erro ao cadastrar perfil: {str(e)}', 'error')
     
     try:
         profiles_list = conn.execute('''
@@ -335,13 +374,48 @@ def profiles():
     finally:
         conn.close()
 
-@app.route('/hotspot-users')
+@app.route('/hotspot-users', methods=['GET', 'POST'])
 @login_required
 def hotspot_users():
     conn = get_db()
     if not conn:
         flash('Erro de conexão com banco de dados', 'error')
         return render_template('hotspot_users.html', hotspot_users=[], companies=[], profiles=[], user={'name': session.get('name')})
+    
+    if request.method == 'POST':
+        try:
+            username = request.form['username']
+            password = request.form['password']
+            profile_id = request.form.get('profile_id')
+            company_id = request.form['company_id']
+            
+            # Insert hotspot user
+            cursor = conn.execute('''
+                INSERT INTO hotspot_users (username, password, profile_id, company_id)
+                VALUES (?, ?, ?, ?)
+            ''', (username, password, profile_id, company_id))
+            
+            user_id = cursor.lastrowid
+            
+            # Get default credits from settings
+            default_credits = conn.execute(
+                'SELECT setting_value FROM system_settings WHERE setting_key = ?',
+                ('default_credits_mb',)
+            ).fetchone()
+            
+            credits_mb = int(default_credits['setting_value']) if default_credits else 1024
+            
+            # Insert user credits
+            conn.execute('''
+                INSERT INTO user_credits (user_id, credits_mb, used_mb)
+                VALUES (?, ?, 0)
+            ''', (user_id, credits_mb))
+            
+            conn.commit()
+            flash('Usuário hotspot cadastrado com sucesso!', 'success')
+            return redirect(url_for('hotspot_users'))
+        except Exception as e:
+            flash(f'Erro ao cadastrar usuário hotspot: {str(e)}', 'error')
     
     try:
         hotspot_users_list = conn.execute('''
@@ -438,118 +512,15 @@ def settings():
     finally:
         conn.close()
 
-# API Routes for AJAX operations
-@app.route('/api/companies', methods=['POST'])
-@login_required
-def api_add_company():
-    conn = get_db()
-    if not conn:
-        return jsonify({'success': False, 'message': 'Erro de conexão com banco de dados'})
-    
-    try:
-        data = request.get_json()
-        conn.execute('''
-            INSERT INTO companies (name, mikrotik_ip, mikrotik_username, mikrotik_password, api_port)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (data['name'], data['mikrotik_ip'], data['mikrotik_username'], 
-              data['mikrotik_password'], data.get('api_port', 8728)))
-        
-        conn.commit()
-        return jsonify({'success': True, 'message': 'Empresa adicionada com sucesso!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Erro ao adicionar empresa: {str(e)}'})
-    finally:
-        conn.close()
-
-@app.route('/api/profiles', methods=['POST'])
-@login_required
-def api_add_profile():
-    conn = get_db()
-    if not conn:
-        return jsonify({'success': False, 'message': 'Erro de conexão com banco de dados'})
-    
-    try:
-        data = request.get_json()
-        conn.execute('''
-            INSERT INTO hotspot_profiles (name, company_id, rate_limit, session_timeout, idle_timeout, shared_users)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (data['name'], data['company_id'], data['rate_limit'], 
-              data.get('session_timeout'), data.get('idle_timeout'), data.get('shared_users', 1)))
-        
-        conn.commit()
-        return jsonify({'success': True, 'message': 'Perfil adicionado com sucesso!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Erro ao adicionar perfil: {str(e)}'})
-    finally:
-        conn.close()
-
-@app.route('/api/hotspot-users', methods=['POST'])
-@login_required
-def api_add_hotspot_user():
-    conn = get_db()
-    if not conn:
-        return jsonify({'success': False, 'message': 'Erro de conexão com banco de dados'})
-    
-    try:
-        data = request.get_json()
-        
-        # Insert hotspot user
-        cursor = conn.execute('''
-            INSERT INTO hotspot_users (username, password, profile_id, company_id)
-            VALUES (?, ?, ?, ?)
-        ''', (data['username'], data['password'], data['profile_id'], data['company_id']))
-        
-        user_id = cursor.lastrowid
-        
-        # Get default credits from settings
-        default_credits = conn.execute(
-            'SELECT setting_value FROM system_settings WHERE setting_key = ?',
-            ('default_credits_mb',)
-        ).fetchone()
-        
-        credits_mb = int(default_credits['setting_value']) if default_credits else 1024
-        
-        # Insert user credits
-        conn.execute('''
-            INSERT INTO user_credits (user_id, credits_mb, used_mb)
-            VALUES (?, ?, 0)
-        ''', (user_id, credits_mb))
-        
-        conn.commit()
-        return jsonify({'success': True, 'message': 'Usuário hotspot adicionado com sucesso!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Erro ao adicionar usuário hotspot: {str(e)}'})
-    finally:
-        conn.close()
-
-@app.route('/api/credits/update', methods=['POST'])
-@login_required
-def api_update_credits():
-    conn = get_db()
-    if not conn:
-        return jsonify({'success': False, 'message': 'Erro de conexão com banco de dados'})
-    
-    try:
-        data = request.get_json()
-        user_id = data['user_id']
-        credits_mb = data['credits_mb']
-        
-        # Update or insert credits
-        conn.execute('''
-            INSERT OR REPLACE INTO user_credits (user_id, credits_mb, used_mb, last_reset)
-            VALUES (?, ?, COALESCE((SELECT used_mb FROM user_credits WHERE user_id = ?), 0), CURRENT_TIMESTAMP)
-        ''', (user_id, credits_mb, user_id))
-        
-        conn.commit()
-        return jsonify({'success': True, 'message': 'Créditos atualizados com sucesso!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Erro ao atualizar créditos: {str(e)}'})
-    finally:
-        conn.close()
-
 if __name__ == '__main__':
     # Initialize database on startup
     init_db()
+    
+    print("🚀 Iniciando MikroTik Manager Flask...")
+    print("📧 Login: admin@demo.com")
+    print("🔑 Senha: admin123")
+    print("🌐 URL: http://localhost:5000")
+    print("💾 Banco: mikrotik_manager.db")
     
     # Run Flask app
     app.run(host='0.0.0.0', port=5000, debug=True)
