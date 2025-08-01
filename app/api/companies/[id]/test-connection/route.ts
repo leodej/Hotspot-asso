@@ -4,27 +4,52 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   try {
     const { id } = params
 
-    // Simular teste de conexão (em produção, usar API RouterOS real)
-    await new Promise((resolve) => setTimeout(resolve, 2000)) // Simular delay
+    // Get company data from database/API
+    const companiesResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api/companies`)
+    const companies = await companiesResponse.json()
+    const company = companies.find((c: any) => c.id === id)
 
-    // Simular resultado aleatório para demonstração
-    const success = Math.random() > 0.3 // 70% de chance de sucesso
-
-    if (success) {
-      return NextResponse.json({
-        success: true,
-        message: "Conexão estabelecida com sucesso",
-        routerInfo: {
-          identity: "MikroTik-Router",
-          version: "7.10.1",
-          uptime: "2w3d15h30m",
-        },
-      })
-    } else {
+    if (!company) {
       return NextResponse.json({
         success: false,
-        message: "Falha na conexão - Verifique IP, porta e credenciais",
-        error: "Connection timeout",
+        message: "Empresa não encontrada",
+        error: "Company not found",
+      })
+    }
+
+    // Test MikroTik connection
+    try {
+      const testResponse = await fetch(`http://${company.mikrotikIp}:${company.mikrotikPort}/rest/system/identity`, {
+        method: "GET",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${company.mikrotikUser}:${company.mikrotikPassword}`).toString("base64")}`,
+        },
+        signal: AbortSignal.timeout(5000), // 5 second timeout
+      })
+
+      if (testResponse.ok) {
+        const routerData = await testResponse.json()
+        return NextResponse.json({
+          success: true,
+          message: "Conexão estabelecida com sucesso",
+          routerInfo: {
+            identity: routerData.name || "MikroTik-Router",
+            version: routerData.version || "Unknown",
+            uptime: routerData.uptime || "Unknown",
+          },
+        })
+      } else {
+        return NextResponse.json({
+          success: false,
+          message: "Falha na autenticação - Verifique usuário e senha",
+          error: "Authentication failed",
+        })
+      }
+    } catch (connectionError) {
+      return NextResponse.json({
+        success: false,
+        message: "Falha na conexão - Verifique IP e porta",
+        error: connectionError instanceof Error ? connectionError.message : "Connection failed",
       })
     }
   } catch (error) {
