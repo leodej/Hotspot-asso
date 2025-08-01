@@ -15,22 +15,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Redirecionar root para dashboard se autenticado, senão para login
-  if (pathname === "/") {
-    const token = request.cookies.get("auth-token")?.value
-    if (token) {
-      try {
-        verify(token, JWT_SECRET)
-        return NextResponse.redirect(new URL("/dashboard", request.url))
-      } catch (error) {
-        return NextResponse.redirect(new URL("/auth/login", request.url))
-      }
-    } else {
-      return NextResponse.redirect(new URL("/auth/login", request.url))
-    }
+  // Permitir arquivos estáticos
+  if (pathname.startsWith("/_next") || pathname.startsWith("/favicon.ico")) {
+    return NextResponse.next()
   }
 
-  // Verificar token de autenticação para rotas protegidas
+  // Verificar token de autenticação
   const token = request.cookies.get("auth-token")?.value
 
   if (!token) {

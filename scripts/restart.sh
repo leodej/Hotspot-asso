@@ -1,17 +1,18 @@
 #!/bin/bash
 
 echo "🔄 Reiniciando MIKROTIK MANAGER..."
-echo "=================================="
+echo "================================"
 
 # Parar containers
 echo "⏹️  Parando containers..."
 docker-compose down
 
-# Aguardar um pouco
-sleep 2
+# Limpar cache do Docker se necessário
+echo "🧹 Limpando cache..."
+docker system prune -f
 
-# Iniciar novamente
-echo "🚀 Iniciando containers..."
+# Construir e iniciar novamente
+echo "🚀 Construindo e iniciando..."
 docker-compose up -d --build
 
 # Aguardar containers iniciarem

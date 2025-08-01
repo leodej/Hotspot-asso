@@ -9,30 +9,33 @@ export async function GET() {
       activeConnections: 892,
       totalCredits: 45230,
       systemStatus: "online",
-      networkHealth: 98.5,
-      recentActivity: [
+      networkHealth: 98,
+      topUsers: [
         {
-          id: 1,
-          type: "user_created",
-          message: "Novo usuário cadastrado",
-          details: "João Silva",
-          timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+          username: "joao.silva",
+          company: "Empresa Alpha",
+          traffic: "2.5 GB",
+          status: "online" as const,
         },
         {
-          id: 2,
-          type: "router_connected",
-          message: "Roteador conectado",
-          details: "192.168.1.1",
-          timestamp: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+          username: "maria.santos",
+          company: "Empresa Beta",
+          traffic: "1.8 GB",
+          status: "online" as const,
         },
         {
-          id: 3,
-          type: "backup_completed",
-          message: "Backup realizado",
-          details: "Sistema",
-          timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+          username: "pedro.costa",
+          company: "Empresa Gamma",
+          traffic: "1.2 GB",
+          status: "offline" as const,
         },
       ],
+      systemHealth: {
+        cpu: 45,
+        memory: 62,
+        disk: 38,
+        uptime: "15d 8h 23m",
+      },
     }
 
     return NextResponse.json(stats)

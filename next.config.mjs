@@ -2,11 +2,10 @@
 const nextConfig = {
   output: 'standalone',
   experimental: {
-    serverComponentsExternalPackages: ['jsonwebtoken']
+    serverComponentsExternalPackages: ['jsonwebtoken'],
   },
-  images: {
-    domains: ['localhost'],
-    unoptimized: true
+  env: {
+    JWT_SECRET: process.env.JWT_SECRET || 'mikrotik-manager-super-secret-key',
   },
   eslint: {
     ignoreDuringBuilds: true,
@@ -14,17 +13,8 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  async headers() {
-    return [
-      {
-        source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
-        ],
-      },
-    ]
+  images: {
+    unoptimized: true,
   },
 }
 

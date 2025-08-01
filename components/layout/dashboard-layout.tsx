@@ -2,136 +2,195 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
-  Menu,
-  Home,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
+import {
+  LayoutDashboard,
   Users,
   Building2,
   Wifi,
   CreditCard,
-  BarChart3,
+  FileText,
   Settings,
   LogOut,
   Router,
   UserCheck,
-  Shield,
 } from "lucide-react"
-import Link from "next/link"
+
+interface User {
+  id: string
+  name: string
+  email: string
+  role: string
+}
 
 interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Usuários do Sistema", href: "/users", icon: Users },
-  { name: "Empresas", href: "/companies", icon: Building2 },
-  { name: "Perfis Hotspot", href: "/profiles", icon: Wifi },
-  { name: "Usuários Hotspot", href: "/hotspot-users", icon: UserCheck },
-  { name: "Créditos", href: "/credits", icon: CreditCard },
-  { name: "Relatórios", href: "/reports", icon: BarChart3 },
-  { name: "Configurações", href: "/settings", icon: Settings },
+const menuItems = [
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    title: "Usuários",
+    url: "/users",
+    icon: Users,
+  },
+  {
+    title: "Empresas",
+    url: "/companies",
+    icon: Building2,
+  },
+  {
+    title: "Perfis Hotspot",
+    url: "/profiles",
+    icon: Wifi,
+  },
+  {
+    title: "Usuários Hotspot",
+    url: "/hotspot-users",
+    icon: UserCheck,
+  },
+  {
+    title: "Créditos",
+    url: "/credits",
+    icon: CreditCard,
+  },
+  {
+    title: "Relatórios",
+    url: "/reports",
+    icon: FileText,
+  },
+  {
+    title: "Configurações",
+    url: "/settings",
+    icon: Settings,
+  },
 ]
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
   const router = useRouter()
   const pathname = usePathname()
 
+  useEffect(() => {
+    // Verificar se há dados do usuário no localStorage
+    const userData = localStorage.getItem("user")
+    if (userData) {
+      setUser(JSON.parse(userData))
+    }
+  }, [])
+
   const handleLogout = () => {
+    // Limpar dados de autenticação
     document.cookie = "auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;"
+    localStorage.removeItem("user")
+
+    // Redirecionar para login
     router.push("/auth/login")
   }
 
-  const Sidebar = ({ mobile = false }) => (
-    <div className="flex h-full flex-col">
-      <div className="flex h-16 shrink-0 items-center px-4">
-        <div className="flex items-center space-x-2">
-          <div className="bg-blue-600 p-2 rounded-lg">
-            <Router className="h-6 w-6 text-white" />
-          </div>
-          <span className="text-lg font-bold">MikroTik Manager</span>
-        </div>
-      </div>
-
-      <nav className="flex-1 space-y-1 px-2 py-4">
-        {navigation.map((item) => {
-          const isActive = pathname === item.href
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
-                isActive ? "bg-blue-100 text-blue-900" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`}
-              onClick={() => mobile && setSidebarOpen(false)}
-            >
-              <item.icon
-                className={`mr-3 h-5 w-5 flex-shrink-0 ${
-                  isActive ? "text-blue-500" : "text-gray-400 group-hover:text-gray-500"
-                }`}
-              />
-              {item.name}
-            </Link>
-          )
-        })}
-      </nav>
-
-      <div className="flex-shrink-0 p-4">
-        <Button variant="outline" className="w-full justify-start bg-transparent" onClick={handleLogout}>
-          <LogOut className="mr-2 h-4 w-4" />
-          Sair
-        </Button>
-      </div>
-    </div>
-  )
-
   return (
-    <div className="h-screen flex">
-      {/* Sidebar Desktop */}
-      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
-        <div className="flex-1 flex flex-col min-h-0 border-r border-gray-200 bg-white">
-          <Sidebar />
-        </div>
-      </div>
-
-      {/* Mobile sidebar */}
-      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="p-0 w-64">
-          <Sidebar mobile />
-        </SheetContent>
-      </Sheet>
-
-      {/* Main content */}
-      <div className="flex flex-col flex-1 md:pl-64">
-        <div className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white shadow">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden ml-4" onClick={() => setSidebarOpen(true)}>
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
-          </Sheet>
-
-          <div className="flex-1 px-4 flex justify-between items-center">
-            <div className="flex-1" />
-            <div className="ml-4 flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Shield className="h-5 w-5 text-green-500" />
-                <span className="text-sm text-muted-foreground">Admin</span>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <Sidebar>
+          <SidebarHeader>
+            <div className="flex items-center space-x-2 px-4 py-2">
+              <div className="bg-blue-600 p-2 rounded-lg">
+                <Router className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">MikroTik Manager</h2>
+                <p className="text-xs text-muted-foreground">Sistema de Gestão</p>
               </div>
             </div>
-          </div>
-        </div>
+          </SidebarHeader>
 
-        <main className="flex-1 overflow-y-auto">
-          <div className="py-6 px-4 sm:px-6 lg:px-8">{children}</div>
-        </main>
+          <SidebarContent>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={pathname === item.url}>
+                    <a href={item.url} className="flex items-center space-x-2">
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarContent>
+
+          <SidebarFooter>
+            <div className="p-4">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-start">
+                    <Avatar className="h-8 w-8 mr-2">
+                      <AvatarImage src="/placeholder-user.jpg" />
+                      <AvatarFallback>{user?.name?.charAt(0) || "U"}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col items-start">
+                      <span className="text-sm font-medium">{user?.name || "Usuário"}</span>
+                      <span className="text-xs text-muted-foreground">{user?.role || "admin"}</span>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Configurações</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sair</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </SidebarFooter>
+        </Sidebar>
+
+        <div className="flex-1 flex flex-col">
+          <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex h-14 items-center px-4">
+              <SidebarTrigger />
+              <div className="ml-auto flex items-center space-x-4">
+                <span className="text-sm text-muted-foreground">Bem-vindo, {user?.name || "Usuário"}</span>
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   )
 }
