@@ -296,22 +296,35 @@ def companies():
     
     if request.method == 'POST':
         try:
-            name = request.form['name']
-            mikrotik_ip = request.form['mikrotik_ip']
-            mikrotik_username = request.form['mikrotik_username']
-            mikrotik_password = request.form['mikrotik_password']
-            api_port = request.form.get('api_port', 8728)
-            
+            # Get form data safely
+            name = request.form.get('name', '').strip()
+            mikrotik_ip = request.form.get('mikrotik_ip', '').strip()
+            mikrotik_username = request.form.get('mikrotik_username', '').strip()
+            mikrotik_password = request.form.get('mikrotik_password', '').strip()
+            api_port = request.form.get('api_port', '8728').strip()
+        
+            # Validate required fields
+            if not all([name, mikrotik_ip, mikrotik_username, mikrotik_password]):
+                flash('Todos os campos são obrigatórios!', 'error')
+                return redirect(url_for('companies'))
+        
+            # Validate port number
+            try:
+                api_port = int(api_port)
+            except ValueError:
+                api_port = 8728
+        
             conn.execute('''
                 INSERT INTO companies (name, mikrotik_ip, mikrotik_username, mikrotik_password, api_port)
                 VALUES (?, ?, ?, ?, ?)
-            ''', (name, mikrotik_ip, mikrotik_username, mikrotik_password, int(api_port)))
-            
+            ''', (name, mikrotik_ip, mikrotik_username, mikrotik_password, api_port))
+        
             conn.commit()
             flash('Empresa cadastrada com sucesso!', 'success')
             return redirect(url_for('companies'))
         except Exception as e:
             flash(f'Erro ao cadastrar empresa: {str(e)}', 'error')
+            print(f"Error details: {e}")  # For debugging
     
     try:
         companies_list = conn.execute('''
