@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block title %}Usuários Hotspot - MikroTik Manager{% endblock %}
+
+{% block body %}
+<div class="container">
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">MT</div>
+            <div class="logo-text">
+                <h2>MikroTik Manager</h2>
+                <p>Sistema de Gestão</p>
+            </div>
+        </div>
+
+        <nav>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('users') }}" class="nav-link">Usuários</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('companies') }}" class="nav-link">Empresas</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('profiles') }}" class="nav-link">Perfis Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('hotspot_users') }}" class="nav-link active">Usuários Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('credits') }}" class="nav-link">Créditos</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('reports') }}" class="nav-link">Relatórios</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('settings') }}" class="nav-link">Configurações</a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="header">
+            <div>
+                <h1>Usuários Hotspot</h1>
+                <p>Gerencie usuários conectados ao hotspot</p>
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ user.name }}</span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
+            </div>
+        </div>
+
+        <style>
+            .filters-bar {
+                display: flex;
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+                background: white;
+                padding: 1rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                align-items: center;
+                flex-wrap: wrap;
+            }
+
+            .filter-group {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .filter-select {
+                padding: 0.5rem;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                background: white;
+            }
+
+            .users-table {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            th, td {
+                padding: 1rem;
+                text-align: left;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            th {
+                background: #f9fafb;
+                font-weight: 600;
+                color: #374151;
+                font-size: 0.875rem;
+            }
+
+            .status-badge {
+                padding: 0.25rem 0.5rem;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                font-weight: 500;
+            }
+
+            .status-online {
+                background: #d1fae5;
+                color: #065f46;
+            }
+
+            .status-offline {
+                background: #fee2e2;
+                color: #991b1b;
+            }
+
+            .status-expired {
+                background: #fef3c7;
+                color: #92400e;
+            }
+
+            .data-usage {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .usage-bar {
+                width: 60px;
+                height: 6px;
+                background: #e5e7eb;
+                border-radius: 3px;
+                overflow: hidden;
+            }
+
+            .usage-fill {
+                height: 100%;
+                background: #3b82f6;
+                transition: width 0.3s;
+            }
+
+            .actions {
+                display: flex;
+                gap: 0.5rem;
+            }
+
+            .btn-sm {
+                padding: 0.25rem 0.5rem;
+                font-size: 0.75rem;
+                border-radius: 4px;
+                border: none;
+                cursor: pointer;
+                text-decoration: none;
+            }
+
+            .btn-disconnect {
+                background: #ef4444;
+                color: white;
+            }
+
+            .btn-extend {
+                background: #10b981;
+                color: white;
+            }
+
+            .btn-edit {
+                background: #f59e0b;
+                color: white;
+            }
+
+            .summary-cards {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .summary-card {
+                background: white;
+                padding: 1rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                text-align: center;
+            }
+
+            .summary-number {
+                font-size: 1.5rem;
+                font-weight: bold;
+                color: #1f2937;
+            }
+
+            .summary-label {
+                font-size: 0.875rem;
+                color: #6b7280;
+            }
+        </style>
+
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="summary-number">32</div>
+                <div class="summary-label">Online</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">15</div>
+                <div class="summary-label">Offline</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">8</div>
+                <div class="summary-label">Expirados</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">55</div>
+                <div class="summary-label">Total</div>
+            </div>
+        </div>
+
+        <div class="filters-bar">
+            <div class="filter-group">
+                <label>Status:</label>
+                <select class="filter-select">
+                    <option>Todos</option>
+                    <option>Online</option>
+                    <option>Offline</option>
+                    <option>Expirado</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Perfil:</label>
+                <select class="filter-select">
+                    <option>Todos</option>
+                    <option>Plano Básico</option>
+                    <option>Plano Premium</option>
+                    <option>Plano Ilimitado</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Empresa:</label>
+                <select class="filter-select">
+                    <option>Todas</option>
+                    <option>TechCorp</option>
+                    <option>NetSolutions</option>
+                    <option>WiFi Express</option>
+                </select>
+            </div>
+            <button class="btn-primary">Filtrar</button>
+        </div>
+
+        <div class="users-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Usuário</th>
+                        <th>Status</th>
+                        <th>Perfil</th>
+                        <th>IP</th>
+                        <th>Tempo Restante</th>
+                        <th>Dados Usados</th>
+                        <th>Empresa</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>user001</td>
+                        <td><span class="status-badge status-online">Online</span></td>
+                        <td>Plano Básico</td>
+                        <td>192.168.1.100</td>
+                        <td>1h 23m</td>
+                        <td>
+                            <div class="data-usage">
+                                <span>2.1GB</span>
+                                <div class="usage-bar">
+                                    <div class="usage-fill" style="width: 42%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>TechCorp</td>
+                        <td class="actions">
+                            <button class="btn-sm btn-disconnect">Desconectar</button>
+                            <button class="btn-sm btn-extend">Estender</button>
+                            <button class="btn-sm btn-edit">Editar</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>premium_user</td>
+                        <td><span class="status-badge status-online">Online</span></td>
+                        <td>Plano Premium</td>
+                        <td>192.168.1.101</td>
+                        <td>Ilimitado</td>
+                        <td>
+                            <div class="data-usage">
+                                <span>4.8GB</span>
+                                <div class="usage-bar">
+                                    <div class="usage-fill" style="width: 96%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>NetSolutions</td>
+                        <td class="actions">
+                            <button class="btn-sm btn-disconnect">Desconectar</button>
+                            <button class="btn-sm btn-extend">Estender</button>
+                            <button class="btn-sm btn-edit">Editar</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>guest_wifi</td>
+                        <td><span class="status-badge status-offline">Offline</span></td>
+                        <td>Plano Básico</td>
+                        <td>-</td>
+                        <td>45m</td>
+                        <td>
+                            <div class="data-usage">
+                                <span>0.8GB</span>
+                                <div class="usage-bar">
+                                    <div class="usage-fill" style="width: 16%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>WiFi Express</td>
+                        <td class="actions">
+                            <button class="btn-sm btn-disconnect" disabled>Desconectar</button>
+                            <button class="btn-sm btn-extend">Estender</button>
+                            <button class="btn-sm btn-edit">Editar</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>expired_user</td>
+                        <td><span class="status-badge status-expired">Expirado</span></td>
+                        <td>Plano Premium</td>
+                        <td>-</td>
+                        <td>Expirado</td>
+                        <td>
+                            <div class="data-usage">
+                                <span>5.0GB</span>
+                                <div class="usage-bar">
+                                    <div class="usage-fill" style="width: 100%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>TechCorp</td>
+                        <td class="actions">
+                            <button class="btn-sm btn-disconnect" disabled>Desconectar</button>
+                            <button class="btn-sm btn-extend">Renovar</button>
+                            <button class="btn-sm btn-edit">Editar</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+{% endblock %}

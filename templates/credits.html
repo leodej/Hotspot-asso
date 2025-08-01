@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}Sistema de Créditos - MikroTik Manager{% endblock %}
+
+{% block body %}
+<div class="container">
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">MT</div>
+            <div class="logo-text">
+                <h2>MikroTik Manager</h2>
+                <p>Sistema de Gestão</p>
+            </div>
+        </div>
+
+        <nav>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('users') }}" class="nav-link">Usuários</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('companies') }}" class="nav-link">Empresas</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('profiles') }}" class="nav-link">Perfis Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('hotspot_users') }}" class="nav-link">Usuários Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('credits') }}" class="nav-link active">Créditos</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('reports') }}" class="nav-link">Relatórios</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('settings') }}" class="nav-link">Configurações</a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="header">
+            <div>
+                <h1>Sistema de Créditos</h1>
+                <p>Gerencie créditos e transações financeiras</p>
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ user.name }}</span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
+            </div>
+        </div>
+
+        <style>
+            .credits-overview {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .credit-card {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 1.5rem;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+
+            .credit-card h3 {
+                font-size: 0.875rem;
+                margin-bottom: 0.5rem;
+                opacity: 0.9;
+            }
+
+            .credit-amount {
+                font-size: 2rem;
+                font-weight: bold;
+                margin-bottom: 0.25rem;
+            }
+
+            .credit-change {
+                font-size: 0.75rem;
+                opacity: 0.8;
+            }
+
+            .stats-card {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                text-align: center;
+            }
+
+            .stat-number {
+                font-size: 1.5rem;
+                font-weight: bold;
+                color: #1f2937;
+                margin-bottom: 0.25rem;
+            }
+
+            .stat-label {
+                font-size: 0.875rem;
+                color: #6b7280;
+            }
+
+            .transactions-section {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                overflow: hidden;
+                margin-bottom: 2rem;
+            }
+
+            .section-header {
+                padding: 1.5rem;
+                border-bottom: 1px solid #f3f4f6;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .section-title {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: #1f2937;
+            }
+
+            .transactions-table {
+                overflow-x: auto;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            th, td {
+                padding: 1rem;
+                text-align: left;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            th {
+                background: #f9fafb;
+                font-weight: 600;
+                color: #374151;
+                font-size: 0.875rem;
+            }
+
+            .transaction-type {
+                padding: 0.25rem 0.5rem;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                font-weight: 500;
+            }
+
+            .type-credit {
+                background: #d1fae5;
+                color: #065f46;
+            }
+
+            .type-debit {
+                background: #fee2e2;
+                color: #991b1b;
+            }
+
+            .type-refund {
+                background: #dbeafe;
+                color: #1e40af;
+            }
+
+            .amount-positive {
+                color: #10b981;
+                font-weight: 600;
+            }
+
+            .amount-negative {
+                color: #ef4444;
+                font-weight: 600;
+            }
+
+            .quick-actions {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
+
+            .action-card {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                text-align: center;
+                cursor: pointer;
+                transition: transform 0.2s;
+            }
+
+            .action-card:hover {
+                transform: translateY(-2px);
+            }
+
+            .action-icon {
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 1rem;
+                font-size: 1.5rem;
+                color: white;
+            }
+
+            .icon-add {
+                background: #10b981;
+            }
+
+            .icon-transfer {
+                background: #3b82f6;
+            }
+
+            .icon-report {
+                background: #f59e0b;
+            }
+
+            .icon-settings {
+                background: #6b7280;
+            }
+        </style>
+
+        <div class="credits-overview">
+            <div class="credit-card">
+                <h3>Saldo Total</h3>
+                <div class="credit-amount">R$ 25.847,50</div>
+                <div class="credit-change">+12% este mês</div>
+            </div>
+
+            <div class="stats-card">
+                <div class="stat-number">R$ 3.250</div>
+                <div class="stat-label">Receita Hoje</div>
+            </div>
+
+            <div class="stats-card">
+                <div class="stat-number">156</div>
+                <div class="stat-label">Transações</div>
+            </div>
+
+            <div class="stats-card">
+                <div class="stat-number">R$ 1.890</div>
+                <div class="stat-label">Pendente</div>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <div class="action-card">
+                <div class="action-icon icon-add">+</div>
+                <h3>Adicionar Créditos</h3>
+                <p>Adicionar créditos manualmente</p>
+            </div>
+
+            <div class="action-card">
+                <div class="action-icon icon-transfer">⇄</div>
+                <h3>Transferir</h3>
+                <p>Transferir entre contas</p>
+            </div>
+
+            <div class="action-card">
+                <div class="action-icon icon-report">📊</div>
+                <h3>Relatório</h3>
+                <p>Gerar relatório financeiro</p>
+            </div>
+
+            <div class="action-card">
+                <div class="action-icon icon-settings">⚙️</div>
+                <h3>Configurar</h3>
+                <p>Configurações de pagamento</p>
+            </div>
+        </div>
+
+        <div class="transactions-section">
+            <div class="section-header">
+                <h2 class="section-title">Transações Recentes</h2>
+                <button class="btn-primary">Ver Todas</button>
+            </div>
+            <div class="transactions-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Data/Hora</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Empresa</th>
+                            <th>Valor</th>
+                            <th>Saldo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>#TXN001</td>
+                            <td>01/08/2024 14:30</td>
+                            <td><span class="transaction-type type-credit">Crédito</span></td>
+                            <td>Compra de plano Premium</td>
+                            <td>TechCorp</td>
+                            <td class="amount-positive">+R$ 15,00</td>
+                            <td>R$ 25.847,50</td>
+                        </tr>
+                        <tr>
+                            <td>#TXN002</td>
+                            <td>01/08/2024 14:15</td>
+                            <td><span class="transaction-type type-credit">Crédito</span></td>
+                            <td>Compra de plano Básico</td>
+                            <td>NetSolutions</td>
+                            <td class="amount-positive">+R$ 5,00</td>
+                            <td>R$ 25.832,50</td>
+                        </tr>
+                        <tr>
+                            <td>#TXN003</td>
+                            <td>01/08/2024 13:45</td>
+                            <td><span class="transaction-type type-debit">Débito</span></td>
+                            <td>Taxa de processamento</td>
+                            <td>Sistema</td>
+                            <td class="amount-negative">-R$ 2,50</td>
+                            <td>R$ 25.827,50</td>
+                        </tr>
+                        <tr>
+                            <td>#TXN004</td>
+                            <td>01/08/2024 13:30</td>
+                            <td><span class="transaction-type type-credit">Crédito</span></td>
+                            <td>Renovação de plano</td>
+                            <td>WiFi Express</td>
+                            <td class="amount-positive">+R$ 30,00</td>
+                            <td>R$ 25.830,00</td>
+                        </tr>
+                        <tr>
+                            <td>#TXN005</td>
+                            <td>01/08/2024 12:15</td>
+                            <td><span class="transaction-type type-refund">Reembolso</span></td>
+                            <td>Cancelamento de plano</td>
+                            <td>TechCorp</td>
+                            <td class="amount-negative">-R$ 10,00</td>
+                            <td>R$ 25.800,00</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

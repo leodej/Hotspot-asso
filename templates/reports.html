@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}Relatórios - MikroTik Manager{% endblock %}
+
+{% block body %}
+<div class="container">
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">MT</div>
+            <div class="logo-text">
+                <h2>MikroTik Manager</h2>
+                <p>Sistema de Gestão</p>
+            </div>
+        </div>
+
+        <nav>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('users') }}" class="nav-link">Usuários</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('companies') }}" class="nav-link">Empresas</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('profiles') }}" class="nav-link">Perfis Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('hotspot_users') }}" class="nav-link">Usuários Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('credits') }}" class="nav-link">Créditos</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('reports') }}" class="nav-link active">Relatórios</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('settings') }}" class="nav-link">Configurações</a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="header">
+            <div>
+                <h1>Relatórios e Análises</h1>
+                <p>Visualize dados e estatísticas do sistema</p>
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ user.name }}</span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
+            </div>
+        </div>
+
+        <style>
+            .report-filters {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                margin-bottom: 2rem;
+            }
+
+            .filter-row {
+                display: flex;
+                gap: 1rem;
+                align-items: end;
+                flex-wrap: wrap;
+            }
+
+            .filter-group {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .filter-group label {
+                font-size: 0.875rem;
+                font-weight: 500;
+                color: #374151;
+            }
+
+            .filter-input {
+                padding: 0.5rem;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                background: white;
+            }
+
+            .charts-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .chart-card {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+
+            .chart-title {
+                font-size: 1.125rem;
+                font-weight: 600;
+                color: #1f2937;
+                margin-bottom: 1rem;
+            }
+
+            .chart-placeholder {
+                height: 250px;
+                background: linear-gradient(45deg, #f3f4f6 25%, transparent 25%), 
+                           linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), 
+                           linear-gradient(45deg, transparent 75%, #f3f4f6 75%), 
+                           linear-gradient(-45deg, transparent 75%, #f3f4f6 75%);
+                background-size: 20px 20px;
+                background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+                border-radius: 6px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #6b7280;
+                font-weight: 500;
+            }
+
+            .metrics-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
+
+            .metric-card {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                text-align: center;
+            }
+
+            .metric-value {
+                font-size: 2rem;
+                font-weight: bold;
+                color: #1f2937;
+                margin-bottom: 0.25rem;
+            }
+
+            .metric-label {
+                font-size: 0.875rem;
+                color: #6b7280;
+                margin-bottom: 0.5rem;
+            }
+
+            .metric-change {
+                font-size: 0.75rem;
+                font-weight: 500;
+            }
+
+            .change-positive {
+                color: #10b981;
+            }
+
+            .change-negative {
+                color: #ef4444;
+            }
+
+            .reports-table {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+
+            .table-header {
+                padding: 1.5rem;
+                border-bottom: 1px solid #f3f4f6;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            th, td {
+                padding: 1rem;
+                text-align: left;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            th {
+                background: #f9fafb;
+                font-weight: 600;
+                color: #374151;
+                font-size: 0.875rem;
+            }
+
+            .export-buttons {
+                display: flex;
+                gap: 0.5rem;
+            }
+
+            .btn-export {
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                background: white;
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+
+            .btn-export:hover {
+                background: #f9fafb;
+            }
+        </style>
+
+        <div class="report-filters">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>Período</label>
+                    <select class="filter-input">
+                        <option>Últimos 7 dias</option>
+                        <option>Últimos 30 dias</option>
+                        <option>Últimos 3 meses</option>
+                        <option>Personalizado</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Data Inicial</label>
+                    <input type="date" class="filter-input" value="2024-07-01">
+                </div>
+                <div class="filter-group">
+                    <label>Data Final</label>
+                    <input type="date" class="filter-input" value="2024-08-01">
+                </div>
+                <div class="filter-group">
+                    <label>Empresa</label>
+                    <select class="filter-input">
+                        <option>Todas</option>
+                        <option>TechCorp</option>
+                        <option>NetSolutions</option>
+                        <option>WiFi Express</option>
+                    </select>
+                </div>
+                <button class="btn-primary">Gerar Relatório</button>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">R$ 12.450</div>
+                <div class="metric-label">Receita Total</div>
+                <div class="metric-change change-positive">+15.3%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">1,234</div>
+                <div class="metric-label">Conexões</div>
+                <div class="metric-change change-positive">+8.7%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">89.2%</div>
+                <div class="metric-label">Uptime</div>
+                <div class="metric-change change-negative">-2.1%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">456 GB</div>
+                <div class="metric-label">Dados Transferidos</div>
+                <div class="metric-change change-positive">+22.4%</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3 class="chart-title">Receita por Dia</h3>
+                <div class="chart-placeholder">Gráfico de Receita Diária</div>
+            </div>
+            <div class="chart-card">
+                <h3 class="chart-title">Usuários Ativos</h3>
+                <div class="chart-placeholder">Gráfico de Usuários Ativos</div>
+            </div>
+            <div class="chart-card">
+                <h3 class="chart-title">Uso de Dados</h3>
+                <div class="chart-placeholder">Gráfico de Uso de Dados</div>
+            </div>
+            <div class="chart-card">
+                <h3 class="chart-title">Perfis Mais Usados</h3>
+                <div class="chart-placeholder">Gráfico de Pizza - Perfis</div>
+            </div>
+        </div>
+
+        <div class="reports-table">
+            <div class="table-header">
+                <h3 class="section-title">Relatório Detalhado</h3>
+                <div class="export-buttons">
+                    <button class="btn-export">📊 Excel</button>
+                    <button class="btn-export">📄 PDF</button>
+                    <button class="btn-export">📋 CSV</button>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Empresa</th>
+                        <th>Usuários</th>
+                        <th>Receita</th>
+                        <th>Dados (GB)</th>
+                        <th>Uptime</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>01/08/2024</td>
+                        <td>TechCorp</td>
+                        <td>45</td>
+                        <td>R$ 675,00</td>
+                        <td>125.4</td>
+                        <td>99.2%</td>
+                    </tr>
+                    <tr>
+                        <td>01/08/2024</td>
+                        <td>NetSolutions</td>
+                        <td>23</td>
+                        <td>R$ 345,00</td>
+                        <td>78.9</td>
+                        <td>98.7%</td>
+                    </tr>
+                    <tr>
+                        <td>01/08/2024</td>
+                        <td>WiFi Express</td>
+                        <td>12</td>
+                        <td>R$ 180,00</td>
+                        <td>45.2</td>
+                        <td>95.1%</td>
+                    </tr>
+                    <tr>
+                        <td>31/07/2024</td>
+                        <td>TechCorp</td>
+                        <td>42</td>
+                        <td>R$ 630,00</td>
+                        <td>118.7</td>
+                        <td>99.8%</td>
+                    </tr>
+                    <tr>
+                        <td>31/07/2024</td>
+                        <td>NetSolutions</td>
+                        <td>25</td>
+                        <td>R$ 375,00</td>
+                        <td>82.3</td>
+                        <td>97.9%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+{% endblock %}

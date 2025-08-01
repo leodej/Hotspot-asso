@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}Empresas - MikroTik Manager{% endblock %}
+
+{% block body %}
+<div class="container">
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">MT</div>
+            <div class="logo-text">
+                <h2>MikroTik Manager</h2>
+                <p>Sistema de Gestão</p>
+            </div>
+        </div>
+
+        <nav>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('users') }}" class="nav-link">Usuários</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('companies') }}" class="nav-link active">Empresas</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('profiles') }}" class="nav-link">Perfis Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('hotspot_users') }}" class="nav-link">Usuários Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('credits') }}" class="nav-link">Créditos</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('reports') }}" class="nav-link">Relatórios</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('settings') }}" class="nav-link">Configurações</a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="header">
+            <div>
+                <h1>Gerenciamento de Empresas</h1>
+                <p>Gerencie empresas e suas configurações MikroTik</p>
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ user.name }}</span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
+            </div>
+        </div>
+
+        <style>
+            .companies-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .company-card {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                padding: 1.5rem;
+                transition: transform 0.2s;
+            }
+
+            .company-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+
+            .company-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: start;
+                margin-bottom: 1rem;
+            }
+
+            .company-name {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: #1f2937;
+                margin-bottom: 0.25rem;
+            }
+
+            .company-status {
+                padding: 0.25rem 0.5rem;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                font-weight: 500;
+            }
+
+            .status-connected {
+                background: #d1fae5;
+                color: #065f46;
+            }
+
+            .status-disconnected {
+                background: #fee2e2;
+                color: #991b1b;
+            }
+
+            .company-info {
+                margin-bottom: 1rem;
+            }
+
+            .info-item {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 0.5rem;
+                font-size: 0.875rem;
+            }
+
+            .info-label {
+                color: #6b7280;
+            }
+
+            .info-value {
+                color: #1f2937;
+                font-weight: 500;
+            }
+
+            .company-actions {
+                display: flex;
+                gap: 0.5rem;
+                margin-top: 1rem;
+            }
+
+            .btn-sm {
+                padding: 0.5rem 1rem;
+                font-size: 0.75rem;
+                border-radius: 4px;
+                border: none;
+                cursor: pointer;
+                text-decoration: none;
+                flex: 1;
+                text-align: center;
+            }
+
+            .btn-primary {
+                background: #3b82f6;
+                color: white;
+            }
+
+            .btn-secondary {
+                background: #6b7280;
+                color: white;
+            }
+
+            .btn-success {
+                background: #10b981;
+                color: white;
+            }
+
+            .add-company-card {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                cursor: pointer;
+                transition: transform 0.2s;
+            }
+
+            .add-company-card:hover {
+                transform: translateY(-2px);
+            }
+
+            .add-icon {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+                opacity: 0.8;
+            }
+        </style>
+
+        <div class="companies-grid">
+            <div class="company-card add-company-card">
+                <div class="add-icon">+</div>
+                <h3>Adicionar Nova Empresa</h3>
+                <p>Clique para cadastrar uma nova empresa</p>
+            </div>
+
+            <div class="company-card">
+                <div class="company-header">
+                    <div>
+                        <div class="company-name">TechCorp Ltda</div>
+                        <div class="company-status status-connected">Conectado</div>
+                    </div>
+                </div>
+                <div class="company-info">
+                    <div class="info-item">
+                        <span class="info-label">IP do Roteador:</span>
+                        <span class="info-value">192.168.1.1</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Usuários Ativos:</span>
+                        <span class="info-value">45</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Última Conexão:</span>
+                        <span class="info-value">Agora mesmo</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Plano:</span>
+                        <span class="info-value">Premium</span>
+                    </div>
+                </div>
+                <div class="company-actions">
+                    <button class="btn-sm btn-primary">Gerenciar</button>
+                    <button class="btn-sm btn-success">Testar</button>
+                    <button class="btn-sm btn-secondary">Editar</button>
+                </div>
+            </div>
+
+            <div class="company-card">
+                <div class="company-header">
+                    <div>
+                        <div class="company-name">NetSolutions</div>
+                        <div class="company-status status-connected">Conectado</div>
+                    </div>
+                </div>
+                <div class="company-info">
+                    <div class="info-item">
+                        <span class="info-label">IP do Roteador:</span>
+                        <span class="info-value">10.0.0.1</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Usuários Ativos:</span>
+                        <span class="info-value">23</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Última Conexão:</span>
+                        <span class="info-value">2 min atrás</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Plano:</span>
+                        <span class="info-value">Básico</span>
+                    </div>
+                </div>
+                <div class="company-actions">
+                    <button class="btn-sm btn-primary">Gerenciar</button>
+                    <button class="btn-sm btn-success">Testar</button>
+                    <button class="btn-sm btn-secondary">Editar</button>
+                </div>
+            </div>
+
+            <div class="company-card">
+                <div class="company-header">
+                    <div>
+                        <div class="company-name">WiFi Express</div>
+                        <div class="company-status status-disconnected">Desconectado</div>
+                    </div>
+                </div>
+                <div class="company-info">
+                    <div class="info-item">
+                        <span class="info-label">IP do Roteador:</span>
+                        <span class="info-value">172.16.1.1</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Usuários Ativos:</span>
+                        <span class="info-value">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Última Conexão:</span>
+                        <span class="info-value">1 hora atrás</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Plano:</span>
+                        <span class="info-value">Standard</span>
+                    </div>
+                </div>
+                <div class="company-actions">
+                    <button class="btn-sm btn-primary">Gerenciar</button>
+                    <button class="btn-sm btn-success">Testar</button>
+                    <button class="btn-sm btn-secondary">Editar</button>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
