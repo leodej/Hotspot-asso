@@ -75,182 +75,133 @@
 
             .stat-card {
                 background: white;
-                border-radius: 8px;
                 padding: 1.5rem;
+                border-radius: 8px;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                border-left: 4px solid #3b82f6;
-            }
-
-            .stat-card.users { border-left-color: #10b981; }
-            .stat-card.companies { border-left-color: #f59e0b; }
-            .stat-card.credits { border-left-color: #8b5cf6; }
-            .stat-card.profiles { border-left-color: #ef4444; }
-
-            .stat-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 0.5rem;
             }
 
             .stat-title {
                 font-size: 0.875rem;
                 color: #6b7280;
                 font-weight: 500;
-            }
-
-            .stat-icon {
-                width: 24px;
-                height: 24px;
-                opacity: 0.6;
+                margin-bottom: 0.5rem;
             }
 
             .stat-value {
                 font-size: 2rem;
-                font-weight: 700;
-                color: #1f2937;
+                font-weight: bold;
                 margin-bottom: 0.25rem;
+                color: #1f2937;
             }
 
             .stat-change {
                 font-size: 0.75rem;
-                color: #10b981;
+                color: #6b7280;
             }
 
-            .activities-section {
+            .activity-section {
                 background: white;
+                padding: 1.5rem;
                 border-radius: 8px;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                overflow: hidden;
             }
 
-            .activities-header {
-                background: #f9fafb;
-                padding: 1rem 1.5rem;
-                border-bottom: 1px solid #e5e7eb;
-            }
-
-            .activities-header h3 {
-                margin: 0;
+            .section-title {
+                font-size: 1.25rem;
+                margin-bottom: 1rem;
                 color: #1f2937;
             }
 
             .activity-item {
-                padding: 1rem 1.5rem;
-                border-bottom: 1px solid #f3f4f6;
                 display: flex;
                 align-items: center;
-                gap: 1rem;
+                padding: 0.75rem 0;
+                border-bottom: 1px solid #f3f4f6;
             }
 
             .activity-item:last-child {
                 border-bottom: none;
             }
 
-            .activity-icon {
-                width: 32px;
-                height: 32px;
+            .activity-dot {
+                width: 8px;
+                height: 8px;
                 border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+                margin-right: 1rem;
+            }
+
+            .activity-dot.success { background: #10b981; }
+            .activity-dot.info { background: #3b82f6; }
+            .activity-dot.warning { background: #f59e0b; }
+
+            .activity-content h4 {
                 font-size: 0.875rem;
-                font-weight: 600;
-                color: white;
-            }
-
-            .activity-icon.user { background: #10b981; }
-            .activity-icon.company { background: #f59e0b; }
-            .activity-icon.credit { background: #8b5cf6; }
-
-            .activity-content {
-                flex: 1;
-            }
-
-            .activity-description {
-                font-weight: 500;
-                color: #1f2937;
                 margin-bottom: 0.25rem;
+                color: #1f2937;
             }
 
-            .activity-time {
+            .activity-content p {
                 font-size: 0.75rem;
                 color: #6b7280;
             }
+
+            .welcome-banner {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                margin-bottom: 2rem;
+                text-align: center;
+            }
+
+            .welcome-banner h2 {
+                font-size: 1.5rem;
+                margin-bottom: 0.5rem;
+            }
         </style>
 
-        <!-- Statistics Cards -->
+        <div class="welcome-banner">
+            <h2>🎉 Bem-vindo ao MikroTik Manager!</h2>
+            <p>Sistema Flask funcionando perfeitamente! Login realizado com sucesso.</p>
+        </div>
+
         <div class="stats-grid">
-            <div class="stat-card users">
-                <div class="stat-header">
-                    <span class="stat-title">Usuários Hotspot</span>
-                    <span class="stat-icon">👥</span>
-                </div>
-                <div class="stat-value">{{ stats.total_users or 0 }}</div>
-                <div class="stat-change">+12% este mês</div>
+            <div class="stat-card">
+                <div class="stat-title">Total de Usuários</div>
+                <div class="stat-value">{{ stats.total_users }}</div>
+                <div class="stat-change">+12% em relação ao mês passado</div>
             </div>
 
-            <div class="stat-card companies">
-                <div class="stat-header">
-                    <span class="stat-title">Empresas Ativas</span>
-                    <span class="stat-icon">🏢</span>
-                </div>
-                <div class="stat-value">{{ stats.total_companies or 0 }}</div>
-                <div class="stat-change">+2 novas</div>
+            <div class="stat-card">
+                <div class="stat-title">Empresas Ativas</div>
+                <div class="stat-value">{{ stats.active_companies }}</div>
+                <div class="stat-change">+3 novas empresas este mês</div>
             </div>
 
-            <div class="stat-card credits">
-                <div class="stat-header">
-                    <span class="stat-title">Créditos Totais</span>
-                    <span class="stat-icon">💳</span>
-                </div>
-                <div class="stat-value">
-                    {% if stats.total_credits_mb and stats.total_credits_mb >= 1024 %}
-                        {{ "%.1f GB"|format(stats.total_credits_mb / 1024) }}
-                    {% else %}
-                        {{ stats.total_credits_mb or 0 }} MB
-                    {% endif %}
-                </div>
-                <div class="stat-change">Disponível</div>
+            <div class="stat-card">
+                <div class="stat-title">Conexões Ativas</div>
+                <div class="stat-value">{{ stats.active_connections }}</div>
+                <div class="stat-change">+8% desde ontem</div>
             </div>
 
-            <div class="stat-card profiles">
-                <div class="stat-header">
-                    <span class="stat-title">Perfis Hotspot</span>
-                    <span class="stat-icon">⚙️</span>
-                </div>
-                <div class="stat-value">{{ stats.total_profiles or 0 }}</div>
-                <div class="stat-change">Configurados</div>
+            <div class="stat-card">
+                <div class="stat-title">Créditos Totais</div>
+                <div class="stat-value">R$ {{ "{:,.0f}".format(stats.total_credits) }}</div>
+                <div class="stat-change">+15% em relação ao mês passado</div>
             </div>
         </div>
 
-        <!-- Recent Activities -->
-        <div class="activities-section">
-            <div class="activities-header">
-                <h3>Atividades Recentes</h3>
+        <div class="activity-section">
+            <h2 class="section-title">Atividade Recente</h2>
+            {% for activity in activities %}
+            <div class="activity-item">
+                <div class="activity-dot {{ activity.type }}"></div>
+                <div class="activity-content">
+                    <h4>{{ activity.title }}</h4>
+                    <p>{{ activity.description }}</p>
+                </div>
             </div>
-            {% if activities %}
-                {% for activity in activities %}
-                <div class="activity-item">
-                    <div class="activity-icon {{ activity.type }}">
-                        {% if activity.type == 'user' %}U{% endif %}
-                        {% if activity.type == 'company' %}C{% endif %}
-                        {% if activity.type == 'credit' %}${% endif %}
-                    </div>
-                    <div class="activity-content">
-                        <div class="activity-description">{{ activity.description }}</div>
-                        <div class="activity-time">{{ activity.time }}</div>
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <div class="activity-item">
-                    <div class="activity-content">
-                        <div class="activity-description">Nenhuma atividade recente</div>
-                        <div class="activity-time">Sistema iniciado</div>
-                    </div>
-                </div>
-            {% endif %}
+            {% endfor %}
         </div>
     </main>
 </div>

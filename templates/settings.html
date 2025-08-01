@@ -44,20 +44,10 @@
     </aside>
 
     <main class="main-content">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-
         <div class="header">
             <div>
                 <h1>Configurações do Sistema</h1>
-                <p>Configurar parâmetros gerais do MikroTik Manager</p>
+                <p>Configure parâmetros e preferências do sistema</p>
             </div>
             <div class="user-info">
                 <span class="user-name">{{ user.name }}</span>
@@ -66,237 +56,263 @@
         </div>
 
         <style>
-            .settings-section {
+            .settings-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+                gap: 1.5rem;
+            }
+
+            .settings-card {
                 background: white;
-                padding: 1.5rem;
                 border-radius: 8px;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                margin-bottom: 2rem;
+                overflow: hidden;
             }
 
-            .section-title {
-                font-size: 1.1rem;
+            .card-header {
+                padding: 1.5rem;
+                border-bottom: 1px solid #f3f4f6;
+                background: #f9fafb;
+            }
+
+            .card-title {
+                font-size: 1.125rem;
                 font-weight: 600;
-                margin-bottom: 1rem;
                 color: #1f2937;
-                border-bottom: 1px solid #e5e7eb;
-                padding-bottom: 0.5rem;
+                margin-bottom: 0.25rem;
             }
 
-            .form-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 1rem;
-                margin-bottom: 1rem;
+            .card-description {
+                font-size: 0.875rem;
+                color: #6b7280;
+            }
+
+            .card-content {
+                padding: 1.5rem;
             }
 
             .form-group {
-                display: flex;
-                flex-direction: column;
+                margin-bottom: 1rem;
             }
 
-            .form-group label {
+            .form-group:last-child {
+                margin-bottom: 0;
+            }
+
+            .form-label {
+                display: block;
+                font-size: 0.875rem;
                 font-weight: 500;
-                margin-bottom: 0.5rem;
                 color: #374151;
+                margin-bottom: 0.5rem;
             }
 
-            .form-group input, .form-group select {
+            .form-input, .form-select {
+                width: 100%;
                 padding: 0.75rem;
                 border: 1px solid #d1d5db;
                 border-radius: 6px;
                 font-size: 0.875rem;
+                transition: border-color 0.2s;
             }
 
-            .form-group input:focus, .form-group select:focus {
+            .form-input:focus, .form-select:focus {
                 outline: none;
                 border-color: #3b82f6;
                 box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
             }
 
-            .form-group small {
-                margin-top: 0.25rem;
-                font-size: 0.75rem;
-                color: #6b7280;
-            }
-
-            .checkbox-group {
+            .form-checkbox {
                 display: flex;
                 align-items: center;
                 gap: 0.5rem;
             }
 
-            .checkbox-group input[type="checkbox"] {
+            .form-checkbox input {
                 width: auto;
-                margin: 0;
             }
 
-            .btn {
-                background: #3b82f6;
+            .btn-save {
+                background: #10b981;
                 color: white;
                 border: none;
                 padding: 0.75rem 1.5rem;
                 border-radius: 6px;
-                cursor: pointer;
+                font-size: 0.875rem;
                 font-weight: 500;
+                cursor: pointer;
                 transition: background-color 0.2s;
             }
 
-            .btn:hover {
-                background: #2563eb;
-            }
-
-            .btn-success {
-                background: #10b981;
-            }
-
-            .btn-success:hover {
+            .btn-save:hover {
                 background: #059669;
             }
 
-            .info-box {
-                background: #eff6ff;
-                border: 1px solid #bfdbfe;
-                border-radius: 6px;
-                padding: 1rem;
-                margin-top: 1rem;
+            .credit-highlight {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
             }
 
-            .info-box h4 {
-                color: #1e40af;
-                margin-bottom: 0.5rem;
-                font-size: 0.9rem;
+            .credit-highlight .card-header {
+                background: rgba(255, 255, 255, 0.1);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             }
 
-            .info-box p {
-                color: #1e40af;
-                font-size: 0.8rem;
-                margin: 0;
+            .credit-highlight .card-title,
+            .credit-highlight .card-description {
+                color: white;
+            }
+
+            .credit-highlight .form-label {
+                color: rgba(255, 255, 255, 0.9);
+            }
+
+            .credit-highlight .form-input,
+            .credit-highlight .form-select {
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                color: white;
+            }
+
+            .credit-highlight .form-input::placeholder {
+                color: rgba(255, 255, 255, 0.7);
+            }
+
+            .help-text {
+                font-size: 0.75rem;
+                color: #6b7280;
+                margin-top: 0.25rem;
+            }
+
+            .credit-highlight .help-text {
+                color: rgba(255, 255, 255, 0.8);
             }
         </style>
 
-        <!-- Configurações de Créditos -->
-        <div class="settings-section">
-            <h3 class="section-title">Configurações de Créditos</h3>
-            <form method="POST">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="default_credit_mb">Crédito Padrão (MB)</label>
-                        <input type="number" id="default_credit_mb" name="default_credit_mb" 
-                               value="{{ settings.default_credit_mb or '1024' }}" required>
-                        <small>Crédito inicial para novos usuários</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="credit_reset_time">Horário de Reset</label>
-                        <input type="time" id="credit_reset_time" name="credit_reset_time" 
-                               value="{{ settings.credit_reset_time or '00:00' }}">
-                        <small>Horário diário para reset dos créditos</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="system_timezone">Timezone do Sistema</label>
-                        <select id="system_timezone" name="system_timezone">
-                            <option value="America/Sao_Paulo" {{ 'selected' if settings.system_timezone == 'America/Sao_Paulo' else '' }}>
-                                América/São Paulo (UTC-3)
-                            </option>
-                            <option value="America/New_York" {{ 'selected' if settings.system_timezone == 'America/New_York' else '' }}>
-                                América/Nova York (UTC-5)
-                            </option>
-                            <option value="Europe/London" {{ 'selected' if settings.system_timezone == 'Europe/London' else '' }}>
-                                Europa/Londres (UTC+0)
-                            </option>
-                        </select>
-                        <small>Timezone para cálculos de data/hora</small>
-                    </div>
-
-                    <div class="form-group">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="enable_cumulative" name="enable_cumulative" 
-                                   {{ 'checked' if settings.enable_cumulative == '1' else '' }}>
-                            <label for="enable_cumulative">Habilitar Créditos Cumulativos</label>
+        <div class="settings-grid">
+            <div class="settings-card credit-highlight">
+                <div class="card-header">
+                    <h3 class="card-title">⚡ Configurações de Créditos</h3>
+                    <p class="card-description">Configure o sistema de créditos em MB/GB</p>
+                </div>
+                <div class="card-content">
+                    <form method="POST">
+                        <div class="form-group">
+                            <label class="form-label">Crédito Padrão (MB)</label>
+                            <input type="number" name="default_credit_mb" class="form-input" 
+                                   value="{{ settings.get('default_credit_mb', 1024) }}" 
+                                   placeholder="1024">
+                            <div class="help-text">Crédito inicial para novos usuários hotspot</div>
                         </div>
-                        <small>Se habilitado, créditos não utilizados são acumulados</small>
+                        <div class="form-group">
+                            <label class="form-label">Horário de Reset</label>
+                            <input type="time" name="credit_reset_time" class="form-input" 
+                                   value="{{ settings.get('credit_reset_time', '00:00') }}">
+                            <div class="help-text">Horário diário para reset/acúmulo de créditos</div>
+                        </div>
+                        <div class="form-group">
+                            <div class="form-checkbox">
+                                <input type="checkbox" name="enable_cumulative" 
+                                       {% if settings.get('enable_cumulative', '1') == '1' %}checked{% endif %}>
+                                <label>Habilitar Créditos Cumulativos</label>
+                            </div>
+                            <div class="help-text">Se ativado, créditos não utilizados são acumulados no dia seguinte</div>
+                        </div>
+                        <button type="submit" class="btn-save">💾 Salvar Configurações</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3 class="card-title">Configurações Gerais</h3>
+                    <p class="card-description">Configurações básicas do sistema</p>
+                </div>
+                <div class="card-content">
+                    <form method="POST">
+                        <div class="form-group">
+                            <label class="form-label">Timezone</label>
+                            <select name="system_timezone" class="form-select">
+                                <option value="America/Sao_Paulo" 
+                                        {% if settings.get('system_timezone') == 'America/Sao_Paulo' %}selected{% endif %}>
+                                    America/Sao_Paulo
+                                </option>
+                                <option value="America/New_York"
+                                        {% if settings.get('system_timezone') == 'America/New_York' %}selected{% endif %}>
+                                    America/New_York
+                                </option>
+                                <option value="Europe/London"
+                                        {% if settings.get('system_timezone') == 'Europe/London' %}selected{% endif %}>
+                                    Europe/London
+                                </option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Nome do Sistema</label>
+                            <input type="text" class="form-input" value="MikroTik Manager" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Versão</label>
+                            <input type="text" class="form-input" value="1.0.0" readonly>
+                        </div>
+                        <button type="submit" class="btn-save">Salvar Configurações</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3 class="card-title">Configurações de Segurança</h3>
+                    <p class="card-description">Configure políticas de segurança</p>
+                </div>
+                <div class="card-content">
+                    <div class="form-group">
+                        <label class="form-label">Tempo de Sessão (minutos)</label>
+                        <input type="number" class="form-input" value="60">
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">Tentativas de Login</label>
+                        <input type="number" class="form-input" value="5">
+                    </div>
+                    <div class="form-group">
+                        <div class="form-checkbox">
+                            <input type="checkbox" checked>
+                            <label>Log de auditoria</label>
+                        </div>
+                    </div>
+                    <button class="btn-save">Salvar Configurações</button>
                 </div>
+            </div>
 
-                <button type="submit" class="btn">Salvar Configurações</button>
-            </form>
-
-            <div class="info-box">
-                <h4>ℹ️ Informações sobre Créditos Cumulativos</h4>
-                <p>
-                    <strong>Habilitado:</strong> Créditos não utilizados são somados aos novos créditos diários.<br>
-                    <strong>Desabilitado:</strong> Créditos são resetados diariamente para o valor padrão.
-                </p>
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3 class="card-title">Backup e Manutenção</h3>
+                    <p class="card-description">Configure backups e manutenção</p>
+                </div>
+                <div class="card-content">
+                    <div class="form-group">
+                        <label class="form-label">Backup Automático</label>
+                        <select class="form-select">
+                            <option>Diário</option>
+                            <option>Semanal</option>
+                            <option>Mensal</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Retenção (dias)</label>
+                        <input type="number" class="form-input" value="30">
+                    </div>
+                    <div class="form-group">
+                        <div class="form-checkbox">
+                            <input type="checkbox" checked>
+                            <label>Backup automático ativado</label>
+                        </div>
+                    </div>
+                    <button class="btn-save">Fazer Backup Agora</button>
+                </div>
             </div>
         </div>
-
-        <!-- Informações do Sistema -->
-        <div class="settings-section">
-            <h3 class="section-title">Informações do Sistema</h3>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Versão do Sistema</label>
-                    <input type="text" value="MikroTik Manager v1.0" readonly>
-                </div>
-
-                <div class="form-group">
-                    <label>Banco de Dados</label>
-                    <input type="text" value="SQLite (mikrotik_manager.db)" readonly>
-                </div>
-
-                <div class="form-group">
-                    <label>Status do Sistema</label>
-                    <input type="text" value="Funcionando" readonly style="color: #10b981;">
-                </div>
-
-                <div class="form-group">
-                    <label>Última Atualização</label>
-                    <input type="text" value="Agora" readonly>
-                </div>
-            </div>
-
-            <div style="margin-top: 1rem;">
-                <button class="btn btn-success" onclick="testSystem()">Testar Sistema</button>
-                <button class="btn" onclick="updateCreditsManual()">Atualizar Créditos Manualmente</button>
-            </div>
-        </div>
-
-        <script>
-            function testSystem() {
-                fetch('/api/health')
-                    .then(response => response.json())
-                    .then(data => {
-                        alert('Sistema funcionando corretamente!\n\nStatus: ' + data.status + '\nMensagem: ' + data.message);
-                    })
-                    .catch(error => {
-                        alert('Erro ao testar sistema: ' + error);
-                    });
-            }
-
-            function updateCreditsManual() {
-                if (confirm('Deseja atualizar os créditos de todos os usuários agora?')) {
-                    fetch('/api/update-credits', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            alert('Créditos atualizados com sucesso!');
-                        } else {
-                            alert('Erro ao atualizar créditos: ' + data.message);
-                        }
-                    })
-                    .catch(error => {
-                        alert('Erro na requisição: ' + error);
-                    });
-                }
-            }
-        </script>
     </main>
 </div>
 {% endblock %}

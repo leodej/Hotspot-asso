@@ -44,20 +44,10 @@
     </aside>
 
     <main class="main-content">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-
         <div class="header">
             <div>
                 <h1>Perfis Hotspot</h1>
-                <p>Gerenciar perfis de acesso para usuários</p>
+                <p>Gerencie perfis de acesso para usuários hotspot</p>
             </div>
             <div class="user-info">
                 <span class="user-name">{{ user.name }}</span>
@@ -66,118 +56,6 @@
         </div>
 
         <style>
-            .form-section {
-                background: white;
-                padding: 1.5rem;
-                border-radius: 8px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                margin-bottom: 2rem;
-            }
-
-            .form-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 1rem;
-                margin-bottom: 1rem;
-            }
-
-            .form-group {
-                display: flex;
-                flex-direction: column;
-            }
-
-            .form-group label {
-                font-weight: 500;
-                margin-bottom: 0.5rem;
-                color: #374151;
-            }
-
-            .form-group input, .form-group select {
-                padding: 0.75rem;
-                border: 1px solid #d1d5db;
-                border-radius: 6px;
-                font-size: 0.875rem;
-            }
-
-            .form-group input:focus, .form-group select:focus {
-                outline: none;
-                border-color: #3b82f6;
-                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-            }
-
-            .btn {
-                background: #3b82f6;
-                color: white;
-                border: none;
-                padding: 0.75rem 1.5rem;
-                border-radius: 6px;
-                cursor: pointer;
-                font-weight: 500;
-                transition: background-color 0.2s;
-            }
-
-            .btn:hover {
-                background: #2563eb;
-            }
-
-            .table-section {
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                overflow: hidden;
-            }
-
-            .table-header {
-                background: #f9fafb;
-                padding: 1rem 1.5rem;
-                border-bottom: 1px solid #e5e7eb;
-            }
-
-            .table-header h3 {
-                margin: 0;
-                color: #1f2937;
-            }
-
-            .table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-
-            .table th, .table td {
-                padding: 1rem 1.5rem;
-                text-align: left;
-                border-bottom: 1px solid #f3f4f6;
-            }
-
-            .table th {
-                background: #f9fafb;
-                font-weight: 600;
-                color: #374151;
-            }
-
-            .table tr:hover {
-                background: #f9fafb;
-            }
-
-            .badge {
-                display: inline-block;
-                padding: 0.25rem 0.75rem;
-                border-radius: 9999px;
-                font-size: 0.75rem;
-                font-weight: 500;
-            }
-
-            .badge-success {
-                background: #d1fae5;
-                color: #065f46;
-            }
-
-            .speed-info {
-                font-family: monospace;
-                font-size: 0.8rem;
-                color: #6b7280;
-            }
-
             .action-bar {
                 display: flex;
                 justify-content: space-between;
@@ -267,6 +145,49 @@
                 max-width: 500px;
             }
 
+            .form-group {
+                margin-bottom: 1rem;
+            }
+
+            .form-label {
+                display: block;
+                margin-bottom: 0.5rem;
+                font-weight: 500;
+            }
+
+            .form-input, .form-select {
+                width: 100%;
+                padding: 0.75rem;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                font-size: 0.875rem;
+            }
+
+            .form-actions {
+                display: flex;
+                gap: 1rem;
+                justify-content: flex-end;
+                margin-top: 1.5rem;
+            }
+
+            .btn-primary {
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: 6px;
+                cursor: pointer;
+            }
+
+            .btn-secondary {
+                background: #6b7280;
+                color: white;
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: 6px;
+                cursor: pointer;
+            }
+
             .add-profile-card {
                 background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                 color: white;
@@ -290,14 +211,50 @@
             }
         </style>
 
-        <!-- Formulário de Cadastro -->
-        <div class="form-section">
-            <h3 style="margin-bottom: 1rem;">Criar Novo Perfil</h3>
-            <form method="POST">
-                <div class="form-grid">
+        <div class="action-bar">
+            <h2>Lista de Perfis</h2>
+            <button class="btn-primary" onclick="openModal()">+ Novo Perfil</button>
+        </div>
+
+        <div class="profiles-grid">
+            {% for profile in profiles_list %}
+            <div class="profile-card">
+                <div class="profile-name">{{ profile.name }}</div>
+                <div class="profile-company">{{ profile.company_name }}</div>
+                <div class="profile-specs">
+                    <div class="spec-item">
+                        <span class="spec-value">{{ profile.download_limit }} Mbps</span>
+                        <span class="spec-label">Download</span>
+                    </div>
+                    <div class="spec-item">
+                        <span class="spec-value">{{ profile.upload_limit }} Mbps</span>
+                        <span class="spec-label">Upload</span>
+                    </div>
+                    {% if profile.time_limit %}
+                    <div class="spec-item">
+                        <span class="spec-value">{{ profile.time_limit }} min</span>
+                        <span class="spec-label">Tempo</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="profile-card add-profile-card" onclick="openModal()">
+                <div class="add-icon">+</div>
+                <h3>Criar Primeiro Perfil</h3>
+                <p>Clique para criar um perfil hotspot</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Modal de Cadastro -->
+        <div id="profileModal" class="modal">
+            <div class="modal-content">
+                <h3>Cadastrar Novo Perfil</h3>
+                <form method="POST">
                     <div class="form-group">
-                        <label for="company_id">Empresa</label>
-                        <select id="company_id" name="company_id" required>
+                        <label class="form-label">Empresa</label>
+                        <select name="company_id" class="form-select" required>
                             <option value="">Selecione uma empresa</option>
                             {% for company in companies_list %}
                             <option value="{{ company.id }}">{{ company.name }}</option>
@@ -305,78 +262,46 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="name">Nome do Perfil</label>
-                        <input type="text" id="name" name="name" placeholder="Ex: Plano Básico" required>
+                        <label class="form-label">Nome do Perfil</label>
+                        <input type="text" name="name" class="form-input" placeholder="Ex: Plano Básico" required>
                     </div>
                     <div class="form-group">
-                        <label for="download_limit">Limite Download (Kbps)</label>
-                        <input type="number" id="download_limit" name="download_limit" placeholder="1024" required>
+                        <label class="form-label">Limite Download (Mbps)</label>
+                        <input type="number" name="download_limit" class="form-input" placeholder="10" required>
                     </div>
                     <div class="form-group">
-                        <label for="upload_limit">Limite Upload (Kbps)</label>
-                        <input type="number" id="upload_limit" name="upload_limit" placeholder="512" required>
+                        <label class="form-label">Limite Upload (Mbps)</label>
+                        <input type="number" name="upload_limit" class="form-input" placeholder="5" required>
                     </div>
                     <div class="form-group">
-                        <label for="time_limit">Limite de Tempo (minutos)</label>
-                        <input type="number" id="time_limit" name="time_limit" placeholder="60">
-                        <small style="color: #6b7280; font-size: 0.75rem;">Deixe vazio para ilimitado</small>
+                        <label class="form-label">Limite de Tempo (minutos)</label>
+                        <input type="number" name="time_limit" class="form-input" placeholder="60">
+                        <small style="color: #6b7280;">Deixe em branco para ilimitado</small>
                     </div>
-                </div>
-                <button type="submit" class="btn">Criar Perfil</button>
-            </form>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button type="submit" class="btn-primary">Cadastrar</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
-        <!-- Lista de Perfis -->
-        <div class="table-section">
-            <div class="table-header">
-                <h3>Perfis Cadastrados</h3>
-            </div>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Nome</th>
-                        <th>Empresa</th>
-                        <th>Velocidades</th>
-                        <th>Tempo Limite</th>
-                        <th>Data de Criação</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for profile in profiles_list %}
-                    <tr>
-                        <td>{{ profile.name }}</td>
-                        <td>{{ profile.company_name }}</td>
-                        <td>
-                            <div class="speed-info">
-                                ↓ {{ profile.download_limit }} Kbps<br>
-                                ↑ {{ profile.upload_limit }} Kbps
-                            </div>
-                        </td>
-                        <td>
-                            {% if profile.time_limit %}
-                                {{ profile.time_limit }} min
-                            {% else %}
-                                Ilimitado
-                            {% endif %}
-                        </td>
-                        <td>{{ profile.created_at[:10] }}</td>
-                        <td>
-                            <span class="badge badge-success">
-                                {{ 'Ativo' if profile.active else 'Inativo' }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="6" style="text-align: center; color: #6b7280; padding: 2rem;">
-                            Nenhum perfil cadastrado
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <script>
+            function openModal() {
+                document.getElementById('profileModal').style.display = 'block';
+            }
+
+            function closeModal() {
+                document.getElementById('profileModal').style.display = 'none';
+            }
+
+            window.onclick = function(event) {
+                const modal = document.getElementById('profileModal');
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            }
+        </script>
     </main>
 </div>
 {% endblock %}

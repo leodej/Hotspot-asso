@@ -44,20 +44,10 @@
     </aside>
 
     <main class="main-content">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-
         <div class="header">
             <div>
-                <h1>Relatórios</h1>
-                <p>Análises e relatórios do sistema</p>
+                <h1>Relatórios e Análises</h1>
+                <p>Visualize dados e estatísticas do sistema</p>
             </div>
             <div class="user-info">
                 <span class="user-name">{{ user.name }}</span>
@@ -76,21 +66,15 @@
             .report-card {
                 background: white;
                 border-radius: 8px;
-                padding: 1.5rem;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                padding: 1.5rem;
                 transition: transform 0.2s;
+                cursor: pointer;
             }
 
             .report-card:hover {
                 transform: translateY(-2px);
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            }
-
-            .report-header {
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-                margin-bottom: 1rem;
             }
 
             .report-icon {
@@ -102,40 +86,50 @@
                 justify-content: center;
                 font-size: 1.5rem;
                 color: white;
+                margin-bottom: 1rem;
             }
 
-            .report-icon.usage { background: #3b82f6; }
-            .report-icon.financial { background: #10b981; }
-            .report-icon.performance { background: #f59e0b; }
-            .report-icon.security { background: #ef4444; }
+            .icon-usage {
+                background: #3b82f6;
+            }
+
+            .icon-users {
+                background: #10b981;
+            }
+
+            .icon-companies {
+                background: #f59e0b;
+            }
+
+            .icon-credits {
+                background: #8b5cf6;
+            }
 
             .report-title {
-                font-size: 1.25rem;
+                font-size: 1.125rem;
                 font-weight: 600;
                 color: #1f2937;
-                margin-bottom: 0.25rem;
+                margin-bottom: 0.5rem;
             }
 
             .report-description {
-                color: #6b7280;
                 font-size: 0.875rem;
+                color: #6b7280;
+                margin-bottom: 1rem;
             }
 
             .report-actions {
                 display: flex;
                 gap: 0.5rem;
-                margin-top: 1rem;
             }
 
-            .btn {
+            .btn-sm {
                 padding: 0.5rem 1rem;
-                border-radius: 6px;
-                font-size: 0.875rem;
-                font-weight: 500;
-                text-decoration: none;
+                font-size: 0.75rem;
+                border-radius: 4px;
                 border: none;
                 cursor: pointer;
-                transition: background-color 0.2s;
+                text-decoration: none;
             }
 
             .btn-primary {
@@ -143,114 +137,171 @@
                 color: white;
             }
 
-            .btn-primary:hover {
-                background: #2563eb;
-            }
-
             .btn-secondary {
-                background: #f3f4f6;
-                color: #374151;
-            }
-
-            .btn-secondary:hover {
-                background: #e5e7eb;
-            }
-
-            .coming-soon {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: #6b7280;
                 color: white;
-                text-align: center;
-                padding: 3rem;
+            }
+
+            .filters-section {
+                background: white;
                 border-radius: 8px;
-                margin-top: 2rem;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                padding: 1.5rem;
+                margin-bottom: 2rem;
             }
 
-            .coming-soon h2 {
-                margin-bottom: 1rem;
-                font-size: 2rem;
-            }
-
-            .coming-soon p {
-                opacity: 0.9;
+            .filters-title {
                 font-size: 1.125rem;
+                font-weight: 600;
+                color: #1f2937;
+                margin-bottom: 1rem;
+            }
+
+            .filters-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            .form-group {
+                margin-bottom: 0;
+            }
+
+            .form-label {
+                display: block;
+                margin-bottom: 0.5rem;
+                font-weight: 500;
+                font-size: 0.875rem;
+            }
+
+            .form-input, .form-select {
+                width: 100%;
+                padding: 0.5rem;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                font-size: 0.875rem;
+            }
+
+            .chart-placeholder {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                padding: 2rem;
+                text-align: center;
+                color: #6b7280;
+                margin-bottom: 2rem;
+            }
+
+            .chart-placeholder h3 {
+                margin-bottom: 1rem;
+                color: #1f2937;
             }
         </style>
 
-        <!-- Reports Grid -->
+        <div class="filters-section">
+            <h3 class="filters-title">Filtros de Relatório</h3>
+            <div class="filters-grid">
+                <div class="form-group">
+                    <label class="form-label">Período</label>
+                    <select class="form-select">
+                        <option>Últimos 7 dias</option>
+                        <option>Últimos 30 dias</option>
+                        <option>Últimos 3 meses</option>
+                        <option>Personalizado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Empresa</label>
+                    <select class="form-select">
+                        <option>Todas as empresas</option>
+                        <option>TechCorp</option>
+                        <option>NetSolutions</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data Inicial</label>
+                    <input type="date" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data Final</label>
+                    <input type="date" class="form-input">
+                </div>
+            </div>
+            <button class="btn-primary">Aplicar Filtros</button>
+        </div>
+
         <div class="reports-grid">
             <div class="report-card">
-                <div class="report-header">
-                    <div class="report-icon usage">📊</div>
-                    <div>
-                        <div class="report-title">Relatório de Uso</div>
-                        <div class="report-description">Análise de consumo de dados por usuário</div>
-                    </div>
-                </div>
+                <div class="report-icon icon-usage">📊</div>
+                <div class="report-title">Uso de Dados</div>
+                <div class="report-description">Relatório detalhado do consumo de dados por usuário e período</div>
                 <div class="report-actions">
-                    <button class="btn btn-primary" onclick="generateReport('usage')">Gerar Relatório</button>
-                    <button class="btn btn-secondary" onclick="scheduleReport('usage')">Agendar</button>
+                    <button class="btn-sm btn-primary">Visualizar</button>
+                    <button class="btn-sm btn-secondary">Exportar</button>
                 </div>
             </div>
 
             <div class="report-card">
-                <div class="report-header">
-                    <div class="report-icon financial">💰</div>
-                    <div>
-                        <div class="report-title">Relatório Financeiro</div>
-                        <div class="report-description">Análise de créditos e faturamento</div>
-                    </div>
-                </div>
+                <div class="report-icon icon-users">👥</div>
+                <div class="report-title">Usuários Ativos</div>
+                <div class="report-description">Análise de usuários ativos, inativos e padrões de uso</div>
                 <div class="report-actions">
-                    <button class="btn btn-primary" onclick="generateReport('financial')">Gerar Relatório</button>
-                    <button class="btn btn-secondary" onclick="scheduleReport('financial')">Agendar</button>
+                    <button class="btn-sm btn-primary">Visualizar</button>
+                    <button class="btn-sm btn-secondary">Exportar</button>
                 </div>
             </div>
 
             <div class="report-card">
-                <div class="report-header">
-                    <div class="report-icon performance">⚡</div>
-                    <div>
-                        <div class="report-title">Performance</div>
-                        <div class="report-description">Análise de performance da rede</div>
-                    </div>
-                </div>
+                <div class="report-icon icon-companies">🏢</div>
+                <div class="report-title">Performance por Empresa</div>
+                <div class="report-description">Comparativo de uso e performance entre empresas</div>
                 <div class="report-actions">
-                    <button class="btn btn-primary" onclick="generateReport('performance')">Gerar Relatório</button>
-                    <button class="btn btn-secondary" onclick="scheduleReport('performance')">Agendar</button>
+                    <button class="btn-sm btn-primary">Visualizar</button>
+                    <button class="btn-sm btn-secondary">Exportar</button>
                 </div>
             </div>
 
             <div class="report-card">
-                <div class="report-header">
-                    <div class="report-icon security">🔒</div>
-                    <div>
-                        <div class="report-title">Segurança</div>
-                        <div class="report-description">Log de acessos e tentativas de login</div>
-                    </div>
-                </div>
+                <div class="report-icon icon-credits">💳</div>
+                <div class="report-title">Gestão de Créditos</div>
+                <div class="report-description">Relatório de distribuição e consumo de créditos</div>
                 <div class="report-actions">
-                    <button class="btn btn-primary" onclick="generateReport('security')">Gerar Relatório</button>
-                    <button class="btn btn-secondary" onclick="scheduleReport('security')">Agendar</button>
+                    <button class="btn-sm btn-primary">Visualizar</button>
+                    <button class="btn-sm btn-secondary">Exportar</button>
                 </div>
             </div>
         </div>
 
-        <!-- Coming Soon Section -->
-        <div class="coming-soon">
-            <h2>🚧 Em Desenvolvimento</h2>
-            <p>Os relatórios detalhados estarão disponíveis em breve.<br>
-            Por enquanto, você pode visualizar as estatísticas no Dashboard.</p>
+        <div class="chart-placeholder">
+            <h3>Gráfico de Uso de Dados</h3>
+            <p>📈 Aqui será exibido um gráfico interativo com os dados filtrados</p>
+            <p style="font-size: 0.875rem; margin-top: 1rem;">
+                Selecione os filtros acima e clique em "Aplicar Filtros" para visualizar os dados
+            </p>
         </div>
 
-        <script>
-            function generateReport(type) {
-                alert(`Gerando relatório de ${type}... (Em desenvolvimento)`);
-            }
-
-            function scheduleReport(type) {
-                alert(`Agendando relatório de ${type}... (Em desenvolvimento)`);
-            }
-        </script>
+        <div class="chart-placeholder">
+            <h3>Estatísticas Gerais</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2rem; margin-top: 2rem;">
+                <div>
+                    <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">0</div>
+                    <div style="font-size: 0.875rem; color: #6b7280;">Sessões Hoje</div>
+                </div>
+                <div>
+                    <div style="font-size: 2rem; font-weight: bold; color: #10b981;">0 MB</div>
+                    <div style="font-size: 0.875rem; color: #6b7280;">Dados Consumidos</div>
+                </div>
+                <div>
+                    <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">0</div>
+                    <div style="font-size: 0.875rem; color: #6b7280;">Usuários Online</div>
+                </div>
+                <div>
+                    <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;">0%</div>
+                    <div style="font-size: 0.875rem; color: #6b7280;">Taxa de Uso</div>
+                </div>
+            </div>
+        </div>
     </main>
 </div>
 {% endblock %}
