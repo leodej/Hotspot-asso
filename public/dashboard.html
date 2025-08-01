@@ -101,7 +101,7 @@
 
         .header {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
             margin-bottom: 2rem;
         }
@@ -119,7 +119,6 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            margin-left: auto;
         }
 
         .stats-grid {
@@ -138,7 +137,7 @@
 
         .stat-header {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
             margin-bottom: 1rem;
         }
@@ -223,6 +222,15 @@
         .logout-btn:hover {
             background: #dc2626;
         }
+
+        .welcome-message {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -295,13 +303,18 @@
         </aside>
 
         <main class="main-content">
+            <div class="welcome-message">
+                <h3>🎉 Bem-vindo ao MikroTik Manager!</h3>
+                <p>Login realizado com sucesso. Sistema funcionando perfeitamente!</p>
+            </div>
+
             <div class="header">
                 <div>
                     <h1>Dashboard</h1>
                     <p>Visão geral do sistema MikroTik Manager</p>
                 </div>
                 <div class="user-info">
-                    <span id="userName">Usuário</span>
+                    <span id="userName">Carregando...</span>
                     <button class="logout-btn" onclick="logout()">Sair</button>
                 </div>
             </div>
@@ -367,26 +380,43 @@
                         <p>Sistema - há 1 hora</p>
                     </div>
                 </div>
+                <div class="activity-item">
+                    <div class="activity-dot green"></div>
+                    <div class="activity-content">
+                        <h4>Login realizado com sucesso</h4>
+                        <p>Sistema funcionando - agora mesmo</p>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
 
     <script>
+        console.log('Dashboard carregado');
+
         // Verificar se está logado
         function checkAuth() {
+            console.log('Verificando autenticação...');
+            
             const token = getCookie('auth-token');
             const user = localStorage.getItem('user');
             
+            console.log('Token:', token ? 'Presente' : 'Ausente');
+            console.log('User data:', user ? 'Presente' : 'Ausente');
+            
             if (!token || !user) {
+                console.log('Não autenticado, redirecionando para login...');
                 window.location.href = '/index.html';
                 return;
             }
             
             try {
                 const userData = JSON.parse(user);
+                console.log('Dados do usuário:', userData);
                 document.getElementById('userName').textContent = userData.name || 'Usuário';
             } catch (e) {
-                console.error('Erro ao parsear dados do usuário');
+                console.error('Erro ao parsear dados do usuário:', e);
+                document.getElementById('userName').textContent = 'Usuário';
             }
         }
 
@@ -397,6 +427,7 @@
         }
 
         function logout() {
+            console.log('Fazendo logout...');
             document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
             localStorage.removeItem('user');
             window.location.href = '/index.html';
