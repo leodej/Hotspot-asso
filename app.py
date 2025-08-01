@@ -70,6 +70,7 @@ def init_db():
             email TEXT,
             full_name TEXT,
             phone TEXT,
+            turma TEXT DEFAULT 'A',
             active INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES companies (id),
@@ -399,6 +400,7 @@ def hotspot_users():
         full_name = request.form.get('full_name')
         email = request.form.get('email')
         phone = request.form.get('phone')
+        turma = request.form.get('turma', 'A')
         
         if not all([company_id, username, password]):
             flash('Campos obrigatórios não preenchidos', 'error')
@@ -407,9 +409,9 @@ def hotspot_users():
             try:
                 user_id = str(uuid.uuid4())
                 conn.execute('''
-                    INSERT INTO hotspot_users (id, company_id, profile_id, username, password, full_name, email, phone)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (user_id, company_id, profile_id, username, password, full_name, email, phone))
+                    INSERT INTO hotspot_users (id, company_id, profile_id, username, password, full_name, email, phone, turma)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (user_id, company_id, profile_id, username, password, full_name, email, phone, turma))
                 
                 # Criar crédito inicial
                 default_credit = int(get_setting('default_credit_mb', 1024))

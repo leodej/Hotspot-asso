@@ -203,6 +203,7 @@
                         <th>Nome Completo</th>
                         <th>Empresa</th>
                         <th>Perfil</th>
+                        <th>Turma</th>
                         <th>Créditos (MB)</th>
                         <th>Status</th>
                         <th>Criado em</th>
@@ -215,6 +216,7 @@
                         <td>{{ hotspot_user.full_name or '-' }}</td>
                         <td>{{ hotspot_user.company_name }}</td>
                         <td>{{ hotspot_user.profile_name or 'Sem perfil' }}</td>
+                        <td><span class="status-badge status-active">Turma {{ hotspot_user.turma }}</span></td>
                         <td class="credit-info">
                             <div class="credit-remaining">{{ hotspot_user.remaining_mb or 0 }} MB restantes</div>
                             <div class="credit-used">{{ hotspot_user.used_mb or 0 }} MB usados</div>
@@ -224,7 +226,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" style="text-align: center; color: #6b7280;">
+                        <td colspan="8" style="text-align: center; color: #6b7280;">
                             Nenhum usuário hotspot cadastrado
                         </td>
                     </tr>
@@ -283,6 +285,14 @@
                             <label class="form-label">Telefone</label>
                             <input type="tel" name="phone" class="form-input" placeholder="(11) 99999-9999">
                         </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Turma</label>
+                        <select name="turma" class="form-select" required>
+                            <option value="A">Turma A</option>
+                            <option value="B">Turma B</option>
+                        </select>
                     </div>
 
                     <div class="form-actions">
