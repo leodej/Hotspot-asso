@@ -168,40 +168,50 @@
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-title">Total de Usuários</div>
-                <div class="stat-value">{{ stats.total_users }}</div>
+                <div class="stat-value">{{ stats.total_users or 0 }}</div>
                 <div class="stat-change">+12% em relação ao mês passado</div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-title">Empresas Ativas</div>
-                <div class="stat-value">{{ stats.active_companies }}</div>
+                <div class="stat-value">{{ stats.active_companies or 0 }}</div>
                 <div class="stat-change">+3 novas empresas este mês</div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-title">Conexões Ativas</div>
-                <div class="stat-value">{{ stats.active_connections }}</div>
+                <div class="stat-value">{{ stats.active_connections or 0 }}</div>
                 <div class="stat-change">+8% desde ontem</div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-title">Créditos Totais</div>
-                <div class="stat-value">R$ {{ "{:,.0f}".format(stats.total_credits) }}</div>
+                <div class="stat-value">{{ stats.total_credits_mb or 0 }} MB</div>
                 <div class="stat-change">+15% em relação ao mês passado</div>
             </div>
         </div>
 
         <div class="activity-section">
             <h2 class="section-title">Atividade Recente</h2>
-            {% for activity in activities %}
-            <div class="activity-item">
-                <div class="activity-dot {{ activity.type }}"></div>
-                <div class="activity-content">
-                    <h4>{{ activity.title }}</h4>
-                    <p>{{ activity.description }}</p>
+            {% if activities %}
+                {% for activity in activities %}
+                <div class="activity-item">
+                    <div class="activity-dot {{ activity.type }}"></div>
+                    <div class="activity-content">
+                        <h4>{{ activity.title }}</h4>
+                        <p>{{ activity.description }}</p>
+                    </div>
                 </div>
-            </div>
-            {% endfor %}
+                {% endfor %}
+            {% else %}
+                <div class="activity-item">
+                    <div class="activity-dot info"></div>
+                    <div class="activity-content">
+                        <h4>Sistema Iniciado</h4>
+                        <p>MikroTik Manager está funcionando corretamente</p>
+                    </div>
+                </div>
+            {% endif %}
         </div>
     </main>
 </div>
