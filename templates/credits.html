@@ -1,76 +1,261 @@
 {% extends "base.html" %}
 
-{% block page_title %}Créditos - MikroTik Manager{% endblock %}
+{% block title %}Sistema de Créditos - MikroTik Manager{% endblock %}
 
-{% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h4><i class="bi bi-credit-card"></i> Gerenciamento de Créditos</h4>
-        <p class="text-muted">Acompanhe e gerencie créditos dos usuários</p>
-    </div>
-    <button class="btn btn-primary" onclick="updateCredits()">
-        <i class="bi bi-arrow-clockwise"></i> Atualizar Créditos
-    </button>
-</div>
+{% block body %}
+<div class="container">
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">MT</div>
+            <div class="logo-text">
+                <h2>MikroTik Manager</h2>
+                <p>Sistema de Gestão</p>
+            </div>
+        </div>
 
-<!-- Stats Cards -->
-<div class="row mb-4">
-    <div class="col-md-3 mb-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-credit-card text-primary" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ format_mb_to_gb(stats.total_credits_mb) }}</h3>
-                <p class="text-muted mb-0">Total de Créditos</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-arrow-down-circle text-danger" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ format_mb_to_gb(stats.used_credits_mb) }}</h3>
-                <p class="text-muted mb-0">Créditos Usados</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-arrow-up-circle text-success" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ format_mb_to_gb(stats.remaining_credits_mb) }}</h3>
-                <p class="text-muted mb-0">Créditos Restantes</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-people text-info" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ stats.active_users }}</h3>
-                <p class="text-muted mb-0">Usuários Ativos</p>
-            </div>
-        </div>
-    </div>
-</div>
+        <nav>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('users') }}" class="nav-link">Usuários</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('companies') }}" class="nav-link">Empresas</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('profiles') }}" class="nav-link">Perfis Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('hotspot_users') }}" class="nav-link">Usuários Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('credits') }}" class="nav-link active">Créditos</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('reports') }}" class="nav-link">Relatórios</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('settings') }}" class="nav-link">Configurações</a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
 
-<!-- Credits Table -->
-<div class="card">
-    <div class="card-header">
-        <h5 class="mb-0">Créditos por Usuário</h5>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
+    <main class="main-content">
+        <div class="header">
+            <div>
+                <h1>Sistema de Créditos</h1>
+                <p>Gerencie créditos de dados em MB/GB</p>
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ user.name }}</span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
+            </div>
+        </div>
+
+        <style>
+            .credits-overview {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .credit-card {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 1.5rem;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+
+            .credit-card h3 {
+                font-size: 0.875rem;
+                margin-bottom: 0.5rem;
+                opacity: 0.9;
+            }
+
+            .credit-amount {
+                font-size: 2rem;
+                font-weight: bold;
+                margin-bottom: 0.25rem;
+            }
+
+            .credit-unit {
+                font-size: 0.75rem;
+                opacity: 0.8;
+            }
+
+            .stats-card {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                text-align: center;
+            }
+
+            .stat-number {
+                font-size: 1.5rem;
+                font-weight: bold;
+                color: #1f2937;
+                margin-bottom: 0.25rem;
+            }
+
+            .stat-label {
+                font-size: 0.875rem;
+                color: #6b7280;
+            }
+
+            .credits-table {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                overflow: hidden;
+                margin-bottom: 2rem;
+            }
+
+            .section-header {
+                padding: 1.5rem;
+                border-bottom: 1px solid #f3f4f6;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .section-title {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: #1f2937;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            th, td {
+                padding: 1rem;
+                text-align: left;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            th {
+                background: #f9fafb;
+                font-weight: 600;
+                color: #374151;
+                font-size: 0.875rem;
+            }
+
+            .credit-bar {
+                width: 100%;
+                height: 8px;
+                background: #f3f4f6;
+                border-radius: 4px;
+                overflow: hidden;
+                margin-top: 0.5rem;
+            }
+
+            .credit-progress {
+                height: 100%;
+                background: linear-gradient(90deg, #10b981, #059669);
+                transition: width 0.3s ease;
+            }
+
+            .credit-info {
+                font-size: 0.875rem;
+            }
+
+            .credit-remaining {
+                color: #10b981;
+                font-weight: 600;
+            }
+
+            .credit-used {
+                color: #ef4444;
+                font-weight: 600;
+            }
+
+            .btn-primary {
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: 6px;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-block;
+            }
+
+            .btn-update {
+                background: #10b981;
+                color: white;
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: 6px;
+                cursor: pointer;
+                margin-bottom: 1rem;
+            }
+        </style>
+
+        <div class="credits-overview">
+            <div class="credit-card">
+                <h3>Total de Créditos</h3>
+                <div class="credit-amount">
+                    {% if stats.total_credits_mb >= 1024 %}
+                        {{ "%.1f"|format(stats.total_credits_mb / 1024) }} GB
+                    {% else %}
+                        {{ stats.total_credits_mb }} MB
+                    {% endif %}
+                </div>
+                <div class="credit-unit">Créditos totais distribuídos</div>
+            </div>
+
+            <div class="stats-card">
+                <div class="stat-number">
+                    {% if stats.used_credits_mb >= 1024 %}
+                        {{ "%.1f"|format(stats.used_credits_mb / 1024) }} GB
+                    {% else %}
+                        {{ stats.used_credits_mb }} MB
+                    {% endif %}
+                </div>
+                <div class="stat-label">Dados Consumidos</div>
+            </div>
+
+            <div class="stats-card">
+                <div class="stat-number">
+                    {% if stats.remaining_credits_mb >= 1024 %}
+                        {{ "%.1f"|format(stats.remaining_credits_mb / 1024) }} GB
+                    {% else %}
+                        {{ stats.remaining_credits_mb }} MB
+                    {% endif %}
+                </div>
+                <div class="stat-label">Dados Disponíveis</div>
+            </div>
+
+            <div class="stats-card">
+                <div class="stat-number">{{ stats.active_users }}</div>
+                <div class="stat-label">Usuários Ativos</div>
+            </div>
+        </div>
+
+        <button class="btn-update" onclick="updateCredits()">🔄 Atualizar Créditos Cumulativos</button>
+
+        <div class="credits-table">
+            <div class="section-header">
+                <h2 class="section-title">Créditos por Usuário</h2>
+                <button class="btn-primary">Exportar Relatório</button>
+            </div>
+            <table>
                 <thead>
                     <tr>
-                        <th>Username</th>
+                        <th>Usuário</th>
                         <th>Nome</th>
                         <th>Empresa</th>
-                        <th>Total</th>
-                        <th>Usado</th>
-                        <th>Restante</th>
+                        <th>Créditos</th>
+                        <th>Uso</th>
                         <th>Último Reset</th>
-                        <th>Atualizado</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -79,15 +264,41 @@
                         <td><strong>{{ credit.username }}</strong></td>
                         <td>{{ credit.full_name or '-' }}</td>
                         <td>{{ credit.company_name }}</td>
-                        <td>{{ format_mb_to_gb(credit.total_mb) }}</td>
-                        <td class="text-danger">{{ format_mb_to_gb(credit.used_mb) }}</td>
-                        <td class="text-success">{{ format_mb_to_gb(credit.remaining_mb) }}</td>
-                        <td>{{ credit.last_reset or '-' }}</td>
-                        <td>{{ credit.updated_at }}</td>
+                        <td class="credit-info">
+                            <div class="credit-remaining">
+                                {% if credit.remaining_mb >= 1024 %}
+                                    {{ "%.1f"|format(credit.remaining_mb / 1024) }} GB restantes
+                                {% else %}
+                                    {{ credit.remaining_mb }} MB restantes
+                                {% endif %}
+                            </div>
+                            <div class="credit-bar">
+                                {% set usage_percent = (credit.used_mb / credit.total_mb * 100) if credit.total_mb > 0 else 0 %}
+                                <div class="credit-progress" style="width: {{ usage_percent }}%"></div>
+                            </div>
+                        </td>
+                        <td class="credit-info">
+                            <div class="credit-used">
+                                {% if credit.used_mb >= 1024 %}
+                                    {{ "%.1f"|format(credit.used_mb / 1024) }} GB usados
+                                {% else %}
+                                    {{ credit.used_mb }} MB usados
+                                {% endif %}
+                            </div>
+                            <div style="font-size: 0.75rem; color: #6b7280;">
+                                de 
+                                {% if credit.total_mb >= 1024 %}
+                                    {{ "%.1f"|format(credit.total_mb / 1024) }} GB
+                                {% else %}
+                                    {{ credit.total_mb }} MB
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>{{ credit.last_reset or 'Nunca' }}</td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" class="text-center text-muted">
+                        <td colspan="6" style="text-align: center; color: #6b7280;">
                             Nenhum crédito encontrado
                         </td>
                     </tr>
@@ -95,31 +306,31 @@
                 </tbody>
             </table>
         </div>
-    </div>
-</div>
-{% endblock %}
 
-{% block scripts %}
-<script>
-function updateCredits() {
-    fetch('/api/update-credits', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert('Créditos atualizados com sucesso!');
-            location.reload();
-        } else {
-            alert('Erro ao atualizar créditos: ' + data.message);
-        }
-    })
-    .catch(error => {
-        alert('Erro na requisição: ' + error);
-    });
-}
-</script>
+        <script>
+            function updateCredits() {
+                if (confirm('Deseja atualizar os créditos cumulativos de todos os usuários?')) {
+                    fetch('/api/update-credits', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            alert('Créditos atualizados com sucesso!');
+                            location.reload();
+                        } else {
+                            alert('Erro ao atualizar créditos: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        alert('Erro na requisição: ' + error);
+                    });
+                }
+            }
+        </script>
+    </main>
+</div>
 {% endblock %}
