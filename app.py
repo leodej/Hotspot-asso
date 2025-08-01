@@ -451,6 +451,49 @@ def hotspot_users():
                          companies_list=companies_list,
                          profiles_list=profiles_list)
 
+@app.route('/hotspot-users/edit', methods=['POST'])
+@require_auth
+def edit_hotspot_user():
+    """Editar usuário hotspot"""
+    user_id = request.form.get('user_id')
+    company_id = request.form.get('company_id')
+    profile_id = request.form.get('profile_id')
+    username = request.form.get('username')
+    password = request.form.get('password')
+    full_name = request.form.get('full_name')
+    email = request.form.get('email')
+    phone = request.form.get('phone')
+    turma = request.form.get('turma', 'A')
+    
+    if not all([user_id, company_id, username]):
+        flash('Campos obrigatórios não preenchidos', 'error')
+    else:
+        conn = get_db()
+        try:
+            if password:  # Se senha foi fornecida, atualizar com senha
+                conn.execute('''
+                    UPDATE hotspot_users 
+                    SET company_id = ?, profile_id = ?, username = ?, password = ?, 
+                        full_name = ?, email = ?, phone = ?, turma = ?
+                    WHERE id = ?
+                ''', (company_id, profile_id, username, password, full_name, email, phone, turma, user_id))
+            else:  # Se senha não foi fornecida, manter a atual
+                conn.execute('''
+                    UPDATE hotspot_users 
+                    SET company_id = ?, profile_id = ?, username = ?, 
+                        full_name = ?, email = ?, phone = ?, turma = ?
+                    WHERE id = ?
+                ''', (company_id, profile_id, username, full_name, email, phone, turma, user_id))
+            
+            conn.commit()
+            flash('Usuário hotspot atualizado com sucesso!', 'success')
+        except sqlite3.IntegrityError:
+            flash('Username já existe', 'error')
+        finally:
+            conn.close()
+    
+    return redirect(url_for('hotspot_users'))
+
 @app.route('/credits')
 @require_auth
 def credits():

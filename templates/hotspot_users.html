@@ -191,7 +191,17 @@
         </style>
 
         <div class="action-bar">
-            <h2>Lista de Usuários Hotspot</h2>
+            <div>
+                <h2>Lista de Usuários Hotspot</h2>
+                <div style="margin-top: 0.5rem;">
+                    <select id="companyFilter" class="form-select" style="width: 200px; display: inline-block;" onchange="filterByCompany()">
+                        <option value="">Todas as empresas</option>
+                        {% for company in companies_list %}
+                        <option value="{{ company.name }}">{{ company.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
             <button class="btn-primary" onclick="openModal()">+ Novo Usuário</button>
         </div>
 
@@ -207,6 +217,7 @@
                         <th>Créditos (MB)</th>
                         <th>Status</th>
                         <th>Criado em</th>
+                        <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -223,10 +234,13 @@
                         </td>
                         <td><span class="status-badge status-active">Ativo</span></td>
                         <td>{{ hotspot_user.created_at }}</td>
+                        <td>
+                            <button class="btn-primary" style="padding: 0.5rem; font-size: 0.75rem;" onclick="editUser('{{ hotspot_user.id }}', '{{ hotspot_user.username }}', '{{ hotspot_user.full_name or '' }}', '{{ hotspot_user.email or '' }}', '{{ hotspot_user.phone or '' }}', '{{ hotspot_user.turma }}', '{{ hotspot_user.company_id }}', '{{ hotspot_user.profile_id or '' }}')">Editar</button>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" style="text-align: center; color: #6b7280;">
+                        <td colspan="9" style="text-align: center; color: #6b7280;">
                             Nenhum usuário hotspot cadastrado
                         </td>
                     </tr>
@@ -303,6 +317,76 @@
             </div>
         </div>
 
+        <!-- Modal de Edição -->
+        <div id="editUserModal" class="modal">
+            <div class="modal-content">
+                <h3>Editar Usuário Hotspot</h3>
+                <form method="POST" action="/hotspot-users/edit">
+                    <input type="hidden" name="user_id" id="edit_user_id">
+                    
+                    <div class="form-group">
+                        <label class="form-label">Empresa</label>
+                        <select name="company_id" id="edit_company_id" class="form-select" required>
+                            <option value="">Selecione uma empresa</option>
+                            {% for company in companies_list %}
+                            <option value="{{ company.id }}">{{ company.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Perfil (Opcional)</label>
+                        <select name="profile_id" id="edit_profile_id" class="form-select">
+                            <option value="">Sem perfil específico</option>
+                            {% for profile in profiles_list %}
+                            <option value="{{ profile.id }}">{{ profile.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Username</label>
+                            <input type="text" name="username" id="edit_username" class="form-input" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Nova Senha (deixe vazio para manter)</label>
+                            <input type="password" name="password" id="edit_password" class="form-input">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Nome Completo</label>
+                        <input type="text" name="full_name" id="edit_full_name" class="form-input">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" id="edit_email" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Telefone</label>
+                            <input type="tel" name="phone" id="edit_phone" class="form-input">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Turma</label>
+                        <select name="turma" id="edit_turma" class="form-select" required>
+                            <option value="A">Turma A</option>
+                            <option value="B">Turma B</option>
+                        </select>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancelar</button>
+                        <button type="submit" class="btn-primary">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <script>
             function openModal() {
                 document.getElementById('userModal').style.display = 'block';
@@ -317,6 +401,38 @@
                 if (event.target == modal) {
                     modal.style.display = 'none';
                 }
+            }
+
+            function editUser(id, username, fullName, email, phone, turma, companyId, profileId) {
+                document.getElementById('edit_user_id').value = id;
+                document.getElementById('edit_username').value = username;
+                document.getElementById('edit_full_name').value = fullName;
+                document.getElementById('edit_email').value = email;
+                document.getElementById('edit_phone').value = phone;
+                document.getElementById('edit_turma').value = turma;
+                document.getElementById('edit_company_id').value = companyId;
+                document.getElementById('edit_profile_id').value = profileId;
+                document.getElementById('editUserModal').style.display = 'block';
+            }
+
+            function closeEditModal() {
+                document.getElementById('editUserModal').style.display = 'none';
+            }
+
+            function filterByCompany() {
+                const filter = document.getElementById('companyFilter').value.toLowerCase();
+                const rows = document.querySelectorAll('tbody tr');
+                
+                rows.forEach(row => {
+                    if (row.cells.length > 1) {
+                        const companyCell = row.cells[2].textContent.toLowerCase();
+                        if (filter === '' || companyCell.includes(filter)) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    }
+                });
             }
         </script>
     </main>
