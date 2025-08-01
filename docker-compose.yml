@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # Aplicação Next.js
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - DATABASE_URL=postgresql://mikrotik:password@postgres:5432/mikrotik_manager
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mikrotik-network
+    volumes:
+      - app-logs:/app/logs
+      - app-backups:/app/backups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Banco de dados PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=mikrotik_manager
+      - POSTGRES_USER=mikrotik
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - mikrotik-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mikrotik"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis para cache e sessões
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - mikrotik-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx como proxy reverso
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - app
+    networks:
+      - mikrotik-network
+    restart: unless-stopped
+
+  # Monitoramento com Prometheus (opcional)
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - mikrotik-network
+    restart: unless-stopped
+
+  # Grafana para visualização (opcional)
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - mikrotik-network
+    restart: unless-stopped
+
+networks:
+  mikrotik-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  app-logs:
+  app-backups:
+  prometheus-data:
+  grafana-data:
