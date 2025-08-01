@@ -506,7 +506,7 @@ def settings():
             if value is not None:
                 conn.execute('''
                     UPDATE system_settings 
-                    SET value = ?, updated_at = CURRENT_TIMESTAMP 
+                    SET value = ? 
                     WHERE key = ?
                 ''', (value, key))
         
