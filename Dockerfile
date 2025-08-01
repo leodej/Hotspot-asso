@@ -1,50 +1,26 @@
-FROM node:18-alpine AS base
+FROM python:3.11-slim
 
-# Instalar dependências apenas quando necessário
-FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Instalar dependências baseado no gerenciador de pacotes preferido
-COPY package.json package-lock.json* ./
-RUN npm ci
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# Rebuild o código fonte apenas quando necessário
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Copiar requirements
+COPY requirements.txt .
+
+# Instalar dependências Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar código da aplicação
 COPY . .
 
-# Desabilitar telemetria durante o build
-ENV NEXT_TELEMETRY_DISABLED 1
+# Criar diretórios necessários
+RUN mkdir -p templates static
 
-RUN npm run build
+# Expor porta
+EXPOSE 5000
 
-# Imagem de produção, copiar todos os arquivos e executar next
-FROM base AS runner
-WORKDIR /app
-
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/public ./public
-
-# Definir as permissões corretas para prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Copiar automaticamente arquivos de saída baseado na detecção de trace
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
-
-EXPOSE 3000
-
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
-
-CMD ["node", "server.js"]
+# Comando para iniciar a aplicação
+CMD ["python", "app.py"]
