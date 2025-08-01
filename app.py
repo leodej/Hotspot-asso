@@ -137,8 +137,12 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        if not email or not password:
+            flash('Email e senha são obrigatórios!', 'error')
+            return render_template('login.html')
         
         try:
             conn = get_db()
@@ -149,8 +153,8 @@ def login():
             
             cursor.execute('''
                 SELECT id, username, name, role FROM users 
-                WHERE username = ? AND password = ?
-            ''', (username, password_hash))
+                WHERE (username = ? OR email = ?) AND password = ?
+            ''', (email, email, password_hash))
             
             user = cursor.fetchone()
             conn.close()
@@ -163,7 +167,7 @@ def login():
                 flash('Login realizado com sucesso!', 'success')
                 return redirect(url_for('dashboard'))
             else:
-                flash('Usuário ou senha inválidos!', 'error')
+                flash('Email ou senha inválidos!', 'error')
                 
         except Exception as e:
             logger.error(f"Erro no login: {e}")
