@@ -1,257 +1,367 @@
 {% extends "base.html" %}
 
-{% block title %}Perfis Hotspot{% endblock %}
+{% block title %}Perfis Hotspot - MikroTik Manager{% endblock %}
 
 {% block body %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2>Perfis Hotspot</h2>
-                    <p class="text-muted">Gerencie os perfis de acesso do hotspot</p>
-                </div>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#profileModal" onclick="resetProfileForm()">
-                    <i class="fas fa-plus"></i> Novo Perfil
-                </button>
+<div class="container">
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">MT</div>
+            <div class="logo-text">
+                <h2>MikroTik Manager</h2>
+                <p>Sistema de Gestão</p>
             </div>
+        </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Lista de Perfis</h5>
-                </div>
-                <div class="card-body">
-                    {% if profiles %}
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Nome</th>
-                                        <th>Download</th>
-                                        <th>Upload</th>
-                                        <th>Tempo Limite</th>
-                                        <th>Status</th>
-                                        <th>Padrão</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for profile in profiles %}
-                                    <tr>
-                                        <td><strong>{{ profile.name }}</strong></td>
-                                        <td>{{ profile.download_limit }} Mbps</td>
-                                        <td>{{ profile.upload_limit }} Mbps</td>
-                                        <td>{{ profile.time_limit }} min</td>
-                                        <td>
-                                            <span class="badge bg-{{ 'success' if profile.active else 'secondary' }}">
-                                                {{ 'Ativo' if profile.active else 'Inativo' }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {% if profile.is_default %}
-                                                <span class="badge bg-primary">Padrão</span>
-                                            {% else %}
-                                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="setDefaultProfile({{ profile.id }})" title="Definir como Padrão">
-                                                    <i class="fas fa-star"></i>
-                                                </button>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <div class="btn-group" role="group">
-                                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="editProfile({{ profile.id }})" title="Editar">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                {% if not profile.is_default %}
-                                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteProfile({{ profile.id }})" title="Excluir">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-4">
-                            <p class="text-muted">Nenhum perfil cadastrado</p>
-                        </div>
+        <nav>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('users') }}" class="nav-link">Usuários</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('companies') }}" class="nav-link">Empresas</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('profiles') }}" class="nav-link active">Perfis Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('hotspot_users') }}" class="nav-link">Usuários Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('credits') }}" class="nav-link">Créditos</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('reports') }}" class="nav-link">Relatórios</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('settings') }}" class="nav-link">Configurações</a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="header">
+            <div>
+                <h1>Perfis Hotspot</h1>
+                <p>Gerencie perfis de acesso para usuários hotspot</p>
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ user.name }}</span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
+            </div>
+        </div>
+
+        <style>
+            .action-bar {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 1.5rem;
+                background: white;
+                padding: 1rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+
+            .profiles-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .profile-card {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                padding: 1.5rem;
+                transition: transform 0.2s;
+            }
+
+            .profile-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+
+            .profile-name {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: #1f2937;
+                margin-bottom: 0.5rem;
+            }
+
+            .profile-company {
+                font-size: 0.875rem;
+                color: #6b7280;
+                margin-bottom: 1rem;
+            }
+
+            .profile-specs {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0.5rem;
+                margin-bottom: 1rem;
+            }
+
+            .spec-item {
+                text-align: center;
+                padding: 0.5rem;
+                background: #f9fafb;
+                border-radius: 6px;
+            }
+
+            .spec-value {
+                font-weight: 600;
+                color: #1f2937;
+                display: block;
+            }
+
+            .spec-label {
+                font-size: 0.75rem;
+                color: #6b7280;
+            }
+
+            .profile-actions {
+                display: flex;
+                gap: 0.5rem;
+                margin-top: 1rem;
+            }
+
+            .btn-action {
+                padding: 0.5rem;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.875rem;
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+                flex: 1;
+                justify-content: center;
+            }
+
+            .btn-edit {
+                background: #10b981;
+                color: white;
+            }
+
+            .btn-delete {
+                background: #ef4444;
+                color: white;
+            }
+
+            .btn-action:hover {
+                opacity: 0.8;
+            }
+
+            .modal {
+                display: none;
+                position: fixed;
+                z-index: 1000;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0,0,0,0.5);
+            }
+
+            .modal-content {
+                background-color: white;
+                margin: 5% auto;
+                padding: 2rem;
+                border-radius: 8px;
+                width: 90%;
+                max-width: 500px;
+            }
+
+            .form-group {
+                margin-bottom: 1rem;
+            }
+
+            .form-label {
+                display: block;
+                margin-bottom: 0.5rem;
+                font-weight: 500;
+            }
+
+            .form-input, .form-select {
+                width: 100%;
+                padding: 0.75rem;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                font-size: 0.875rem;
+            }
+
+            .form-actions {
+                display: flex;
+                gap: 1rem;
+                justify-content: flex-end;
+                margin-top: 1.5rem;
+            }
+
+            .btn-primary {
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: 6px;
+                cursor: pointer;
+            }
+
+            .btn-secondary {
+                background: #6b7280;
+                color: white;
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: 6px;
+                cursor: pointer;
+            }
+
+            .add-profile-card {
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                cursor: pointer;
+                transition: transform 0.2s;
+            }
+
+            .add-profile-card:hover {
+                transform: translateY(-2px);
+            }
+
+            .add-icon {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+                opacity: 0.8;
+            }
+        </style>
+
+        <div class="action-bar">
+            <h2>Lista de Perfis</h2>
+            <button class="btn-primary" onclick="openModal()">+ Novo Perfil</button>
+        </div>
+
+        <div class="profiles-grid">
+            {% for profile in profiles_list %}
+            <div class="profile-card">
+                <div class="profile-name">{{ profile.name }}</div>
+                <div class="profile-company">{{ profile.company_name }}</div>
+                <div class="profile-specs">
+                    <div class="spec-item">
+                        <span class="spec-value">{{ profile.download_limit }} Mbps</span>
+                        <span class="spec-label">Download</span>
+                    </div>
+                    <div class="spec-item">
+                        <span class="spec-value">{{ profile.upload_limit }} Mbps</span>
+                        <span class="spec-label">Upload</span>
+                    </div>
+                    {% if profile.time_limit %}
+                    <div class="spec-item">
+                        <span class="spec-value">{{ profile.time_limit }} min</span>
+                        <span class="spec-label">Tempo</span>
+                    </div>
                     {% endif %}
                 </div>
+                <div class="profile-actions">
+                    <button class="btn-action btn-edit" onclick="editProfile({{ profile.id }})" title="Editar">
+                        ✏️ Editar
+                    </button>
+                    <button class="btn-action btn-delete" onclick="deleteProfile({{ profile.id }})" title="Excluir">
+                        🗑️ Excluir
+                    </button>
+                </div>
             </div>
+            {% else %}
+            <div class="profile-card add-profile-card" onclick="openModal()">
+                <div class="add-icon">+</div>
+                <h3>Criar Primeiro Perfil</h3>
+                <p>Clique para criar um perfil hotspot</p>
+            </div>
+            {% endfor %}
         </div>
-    </div>
-</div>
 
-<!-- Modal para Novo/Editar Perfil -->
-<div class="modal fade" id="profileModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="profileModalTitle">Novo Perfil</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="profileForm" onsubmit="saveProfile(event)">
-                <div class="modal-body">
+        <!-- Modal de Cadastro/Edição -->
+        <div id="profileModal" class="modal">
+            <div class="modal-content">
+                <h3 id="modalTitle">Cadastrar Novo Perfil</h3>
+                <form id="profileForm" method="POST">
                     <input type="hidden" id="profileId" name="id">
-                    <div class="mb-3">
-                        <label for="profileName" class="form-label">Nome do Perfil</label>
-                        <input type="text" class="form-control" id="profileName" name="name" required>
+                    <div class="form-group">
+                        <label class="form-label">Empresa</label>
+                        <select id="profileCompany" name="company_id" class="form-select" required>
+                            <option value="">Selecione uma empresa</option>
+                            {% for company in companies_list %}
+                            <option value="{{ company.id }}">{{ company.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="downloadLimit" class="form-label">Download (Mbps)</label>
-                                <input type="number" class="form-control" id="downloadLimit" name="download_limit" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="uploadLimit" class="form-label">Upload (Mbps)</label>
-                                <input type="number" class="form-control" id="uploadLimit" name="upload_limit" required>
-                            </div>
-                        </div>
+                    <div class="form-group">
+                        <label class="form-label">Nome do Perfil</label>
+                        <input type="text" id="profileName" name="name" class="form-input" placeholder="Ex: Plano Básico" required>
                     </div>
-                    <div class="mb-3">
-                        <label for="timeLimit" class="form-label">Tempo Limite (minutos)</label>
-                        <input type="number" class="form-control" id="timeLimit" name="time_limit" required>
+                    <div class="form-group">
+                        <label class="form-label">Limite Download (Mbps)</label>
+                        <input type="number" id="profileDownload" name="download_limit" class="form-input" placeholder="10" required>
                     </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="profileActive" name="active" checked>
-                            <label class="form-check-label" for="profileActive">
-                                Perfil Ativo
-                            </label>
-                        </div>
+                    <div class="form-group">
+                        <label class="form-label">Limite Upload (Mbps)</label>
+                        <input type="number" id="profileUpload" name="upload_limit" class="form-input" placeholder="5" required>
                     </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="isDefault" name="is_default">
-                            <label class="form-check-label" for="isDefault">
-                                Definir como Perfil Padrão
-                            </label>
-                        </div>
+                    <div class="form-group">
+                        <label class="form-label">Limite de Tempo (minutos)</label>
+                        <input type="number" id="profileTime" name="time_limit" class="form-input" placeholder="60">
+                        <small style="color: #6b7280;">Deixe em branco para ilimitado</small>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar</button>
-                </div>
-            </form>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+                        <button type="submit" class="btn-primary">Salvar</button>
+                    </div>
+                </form>
+            </div>
         </div>
-    </div>
+
+        <script>
+            function openModal() {
+                document.getElementById('profileModal').style.display = 'block';
+                document.getElementById('modalTitle').textContent = 'Cadastrar Novo Perfil';
+                document.getElementById('profileForm').reset();
+                document.getElementById('profileId').value = '';
+            }
+
+            function closeModal() {
+                document.getElementById('profileModal').style.display = 'none';
+            }
+
+            function editProfile(id) {
+                // Aqui você pode fazer uma requisição AJAX para buscar os dados do perfil
+                // Por enquanto, vou apenas abrir o modal
+                document.getElementById('profileModal').style.display = 'block';
+                document.getElementById('modalTitle').textContent = 'Editar Perfil';
+                document.getElementById('profileId').value = id;
+            }
+
+            function deleteProfile(id) {
+                if (confirm('Tem certeza que deseja excluir este perfil?')) {
+                    // Aqui você pode fazer uma requisição para excluir o perfil
+                    window.location.href = '/profiles/delete/' + id;
+                }
+            }
+
+            window.onclick = function(event) {
+                const modal = document.getElementById('profileModal');
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            }
+        </script>
+    </main>
 </div>
-
-<script>
-function resetProfileForm() {
-    document.getElementById('profileForm').reset();
-    document.getElementById('profileId').value = '';
-    document.getElementById('profileModalTitle').textContent = 'Novo Perfil';
-    document.getElementById('profileActive').checked = true;
-    document.getElementById('isDefault').checked = false;
-}
-
-function editProfile(id) {
-    fetch(`/api/profiles/${id}`)
-        .then(response => response.json())
-        .then(profile => {
-            document.getElementById('profileId').value = profile.id;
-            document.getElementById('profileName').value = profile.name;
-            document.getElementById('downloadLimit').value = profile.download_limit;
-            document.getElementById('uploadLimit').value = profile.upload_limit;
-            document.getElementById('timeLimit').value = profile.time_limit;
-            document.getElementById('profileActive').checked = profile.active;
-            document.getElementById('isDefault').checked = profile.is_default;
-            document.getElementById('profileModalTitle').textContent = 'Editar Perfil';
-            
-            new bootstrap.Modal(document.getElementById('profileModal')).show();
-        })
-        .catch(error => {
-            console.error('Erro ao carregar perfil:', error);
-            alert('Erro ao carregar dados do perfil');
-        });
-}
-
-function saveProfile(event) {
-    event.preventDefault();
-    
-    const formData = new FormData(event.target);
-    const profileId = formData.get('id');
-    const isEdit = profileId && profileId !== '';
-    
-    const data = {
-        name: formData.get('name'),
-        download_limit: parseInt(formData.get('download_limit')),
-        upload_limit: parseInt(formData.get('upload_limit')),
-        time_limit: parseInt(formData.get('time_limit')),
-        active: formData.has('active'),
-        is_default: formData.has('is_default')
-    };
-    
-    const url = isEdit ? `/api/profiles/${profileId}` : '/api/profiles';
-    const method = isEdit ? 'PUT' : 'POST';
-    
-    fetch(url, {
-        method: method,
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success || result.id) {
-            bootstrap.Modal.getInstance(document.getElementById('profileModal')).hide();
-            location.reload();
-        } else {
-            alert('Erro ao salvar perfil: ' + (result.message || 'Erro desconhecido'));
-        }
-    })
-    .catch(error => {
-        console.error('Erro ao salvar perfil:', error);
-        alert('Erro ao salvar perfil');
-    });
-}
-
-function deleteProfile(id) {
-    if (confirm('Tem certeza que deseja excluir este perfil?')) {
-        fetch(`/api/profiles/${id}`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                location.reload();
-            } else {
-                alert('Erro ao excluir perfil: ' + (result.message || 'Erro desconhecido'));
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao excluir perfil:', error);
-            alert('Erro ao excluir perfil');
-        });
-    }
-}
-
-function setDefaultProfile(id) {
-    if (confirm('Definir este perfil como padrão?')) {
-        fetch(`/api/profiles/${id}/set-default`, {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                location.reload();
-            } else {
-                alert('Erro ao definir perfil padrão: ' + (result.message || 'Erro desconhecido'));
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao definir perfil padrão:', error);
-            alert('Erro ao definir perfil padrão');
-        });
-    }
-}
-</script>
 {% endblock %}
