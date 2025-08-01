@@ -1,80 +1,37 @@
 #!/bin/bash
 
 echo "🔍 Verificando portas do MIKROTIK MANAGER..."
-echo "================================================"
+echo "============================================"
 
-# Verificar se Docker está rodando
-if ! docker info > /dev/null 2>&1; then
-    echo "❌ Docker não está rodando!"
-    exit 1
-fi
-
-# Verificar containers
-echo "📦 Status dos Containers:"
-docker-compose ps
-
-echo ""
-echo "🌐 Portas em uso:"
-echo "------------------------------------------------"
-
-# Verificar portas específicas
-ports=(80 443 3000 5432 6379 9090 3001)
-
-for port in "${ports[@]}"; do
+# Função para verificar porta
+check_port() {
+    local port=$1
+    local service=$2
+    
     if ss -tlnp | grep -q ":$port "; then
-        service=$(ss -tlnp | grep ":$port " | awk '{print $1}')
-        echo "✅ Porta $port: ATIVA ($service)"
+        echo "✅ Porta $port ($service) - ATIVA"
     else
-        echo "❌ Porta $port: INATIVA"
+        echo "❌ Porta $port ($service) - INATIVA"
     fi
-done
+}
+
+# Verificar portas principais
+check_port 3000 "Aplicação Next.js"
+check_port 80 "Nginx HTTP"
+check_port 443 "Nginx HTTPS"
+check_port 5432 "PostgreSQL"
+check_port 6379 "Redis"
+check_port 9090 "Prometheus"
+check_port 3001 "Grafana"
 
 echo ""
-echo "🔗 URLs de Acesso:"
-echo "------------------------------------------------"
-echo "🌐 Interface Principal: https://localhost"
-echo "🌐 Interface HTTP: http://localhost"
-echo "📱 Aplicação Direta: http://localhost:3000"
-echo "🔧 API Health: http://localhost:3000/api/health"
-echo "📊 Grafana: http://localhost:3001"
-echo "📈 Prometheus: http://localhost:9090"
+echo "🌐 URLs de Acesso:"
+echo "   Aplicação: http://localhost:3000"
+echo "   Nginx HTTP: http://localhost"
+echo "   Nginx HTTPS: https://localhost"
+echo "   Prometheus: http://localhost:9090"
+echo "   Grafana: http://localhost:3001"
 
 echo ""
-echo "👤 Credenciais de Login:"
-echo "------------------------------------------------"
-echo "📧 Email: admin@demo.com"
-echo "🔑 Senha: admin123"
-echo "👑 Papel: Administrador"
-echo ""
-echo "📧 Email: admin@mikrotik-manager.com"
-echo "🔑 Senha: admin123"
-echo "👑 Papel: Administrador"
-echo ""
-echo "📧 Email: manager@demo.com"
-echo "🔑 Senha: manager123"
-echo "👑 Papel: Gerente"
-
-echo ""
-echo "🧪 Testando conectividade..."
-echo "------------------------------------------------"
-
-# Testar API Health
-if curl -s http://localhost:3000/api/health > /dev/null; then
-    echo "✅ API Health: FUNCIONANDO"
-else
-    echo "❌ API Health: FALHA"
-fi
-
-# Testar página principal
-if curl -s http://localhost:3000 > /dev/null; then
-    echo "✅ Aplicação: FUNCIONANDO"
-else
-    echo "❌ Aplicação: FALHA"
-fi
-
-echo ""
-echo "📋 Para ver logs em tempo real:"
-echo "   ./scripts/logs.sh"
-echo ""
-echo "🔄 Para reiniciar o sistema:"
-echo "   ./scripts/stop.sh && ./scripts/start.sh"
+echo "🔧 Para testar conectividade:"
+echo "   curl http://localhost:3000/api/health"

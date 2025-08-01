@@ -1,11 +1,18 @@
 #!/bin/bash
 
 echo "🛑 Parando MIKROTIK MANAGER..."
-echo "=============================="
 
 # Parar todos os containers
 docker-compose down
 
-echo "✅ Todos os containers foram parados!"
-echo ""
-echo "🔄 Para iniciar novamente: ./scripts/start.sh"
+# Verificar se pararam
+if [ $? -eq 0 ]; then
+    echo "✅ Containers parados com sucesso"
+else
+    echo "❌ Erro ao parar containers"
+    exit 1
+fi
+
+# Mostrar status
+echo "📊 Status final:"
+docker-compose ps
