@@ -1,557 +1,559 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-import os
-import json
-from datetime import datetime, timedelta
-import hashlib
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import sqlite3
-import uuid
+import hashlib
+import os
+from datetime import datetime
+import logging
+
+# Configuração de logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = 'mikrotik-manager-super-secret-key-2024'
+app.secret_key = 'mikrotik-manager-secret-key-2024'
 
-# Configurações
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
-
-# Inicializar banco de dados SQLite
-def init_db():
-    conn = sqlite3.connect('mikrotik_manager.db')
-    cursor = conn.cursor()
-    
-    # Tabela de usuários do sistema
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS system_users (
-            id TEXT PRIMARY KEY,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            name TEXT NOT NULL,
-            role TEXT DEFAULT 'user',
-            active INTEGER DEFAULT 1,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Tabela de empresas
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS companies (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            mikrotik_ip TEXT NOT NULL,
-            mikrotik_port INTEGER DEFAULT 8728,
-            mikrotik_user TEXT NOT NULL,
-            mikrotik_password TEXT NOT NULL,
-            active INTEGER DEFAULT 1,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Tabela de perfis hotspot
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS hotspot_profiles (
-            id TEXT PRIMARY KEY,
-            company_id TEXT,
-            name TEXT NOT NULL,
-            download_limit INTEGER NOT NULL,
-            upload_limit INTEGER NOT NULL,
-            time_limit INTEGER,
-            active INTEGER DEFAULT 1,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (company_id) REFERENCES companies (id)
-        )
-    ''')
-    
-    # Tabela de usuários hotspot
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS hotspot_users (
-            id TEXT PRIMARY KEY,
-            company_id TEXT,
-            profile_id TEXT,
-            username TEXT NOT NULL,
-            password TEXT NOT NULL,
-            email TEXT,
-            full_name TEXT,
-            phone TEXT,
-            active INTEGER DEFAULT 1,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (company_id) REFERENCES companies (id),
-            FOREIGN KEY (profile_id) REFERENCES hotspot_profiles (id)
-        )
-    ''')
-    
-    # Tabela de créditos (em MB)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_credits (
-            id TEXT PRIMARY KEY,
-            hotspot_user_id TEXT,
-            total_mb INTEGER DEFAULT 0,
-            used_mb INTEGER DEFAULT 0,
-            remaining_mb INTEGER DEFAULT 0,
-            last_reset DATE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (hotspot_user_id) REFERENCES hotspot_users (id)
-        )
-    ''')
-    
-    # Tabela de configurações
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS system_settings (
-            id TEXT PRIMARY KEY,
-            key TEXT UNIQUE NOT NULL,
-            value TEXT,
-            description TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Inserir usuário admin padrão
-    cursor.execute('''
-        INSERT OR IGNORE INTO system_users (id, email, password, name, role)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (str(uuid.uuid4()), 'admin@demo.com', 'admin123', 'Administrador Sistema', 'admin'))
-    
-    # Inserir configurações padrão
-    settings = [
-        ('default_credit_mb', '1024', 'Crédito padrão em MB para novos usuários'),
-        ('credit_reset_time', '00:00', 'Horário de reset dos créditos diários'),
-        ('enable_cumulative', '1', 'Habilitar créditos cumulativos'),
-        ('system_timezone', 'America/Sao_Paulo', 'Timezone do sistema')
-    ]
-    
-    for key, value, desc in settings:
-        cursor.execute('''
-            INSERT OR IGNORE INTO system_settings (id, key, value, description)
-            VALUES (?, ?, ?, ?)
-        ''', (str(uuid.uuid4()), key, value, desc))
-    
-    conn.commit()
-    conn.close()
+# Configuração do banco de dados
+DATABASE_PATH = 'data/mikrotik_manager.db'
 
 def get_db():
-    conn = sqlite3.connect('mikrotik_manager.db')
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Conecta ao banco de dados SQLite"""
+    try:
+        # Criar diretório data se não existir
+        os.makedirs('data', exist_ok=True)
+        
+        conn = sqlite3.connect(DATABASE_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+    except Exception as e:
+        logger.error(f"Erro ao conectar com o banco: {e}")
+        raise
 
-def check_auth():
-    """Verifica se o usuário está autenticado"""
-    return 'user_id' in session and 'email' in session
+def init_db():
+    """Inicializa o banco de dados com as tabelas necessárias"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Tabela de usuários
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                name TEXT NOT NULL,
+                email TEXT,
+                role TEXT DEFAULT 'user',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Tabela de empresas
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS companies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                mikrotik_ip TEXT NOT NULL,
+                mikrotik_username TEXT NOT NULL,
+                mikrotik_password TEXT NOT NULL,
+                api_port INTEGER DEFAULT 8728,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Tabela de perfis hotspot
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS hotspot_profiles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER,
+                name TEXT NOT NULL,
+                rate_limit TEXT,
+                session_timeout INTEGER,
+                idle_timeout INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (company_id) REFERENCES companies (id)
+            )
+        ''')
+        
+        # Tabela de usuários hotspot
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS hotspot_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER,
+                profile_id INTEGER,
+                username TEXT NOT NULL,
+                password TEXT NOT NULL,
+                credits_mb INTEGER DEFAULT 0,
+                expiry_date DATE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (company_id) REFERENCES companies (id),
+                FOREIGN KEY (profile_id) REFERENCES hotspot_profiles (id)
+            )
+        ''')
+        
+        # Tabela de créditos
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS credits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hotspot_user_id INTEGER,
+                amount_mb INTEGER NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (hotspot_user_id) REFERENCES hotspot_users (id)
+            )
+        ''')
+        
+        # Inserir usuário admin padrão se não existir
+        cursor.execute("SELECT COUNT(*) FROM users WHERE username = 'admin'")
+        if cursor.fetchone()[0] == 0:
+            admin_password = hashlib.sha256('admin123'.encode()).hexdigest()
+            cursor.execute('''
+                INSERT INTO users (username, password, name, email, role)
+                VALUES (?, ?, ?, ?, ?)
+            ''', ('admin', admin_password, 'Administrador', 'admin@mikrotik.local', 'admin'))
+        
+        conn.commit()
+        conn.close()
+        logger.info("Banco de dados inicializado com sucesso")
+        
+    except Exception as e:
+        logger.error(f"Erro ao inicializar banco de dados: {e}")
+        raise
 
-def require_auth(f):
-    """Decorator para rotas que requerem autenticação"""
+# Decorador para verificar login
+def login_required(f):
     def decorated_function(*args, **kwargs):
-        if not check_auth():
+        if 'user_id' not in session:
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     decorated_function.__name__ = f.__name__
     return decorated_function
 
-def get_setting(key, default=None):
-    """Busca uma configuração do sistema"""
-    conn = get_db()
-    setting = conn.execute('SELECT value FROM system_settings WHERE key = ?', (key,)).fetchone()
-    conn.close()
-    return setting['value'] if setting else default
-
-def update_credits_cumulative():
-    """Atualiza créditos cumulativos diariamente"""
-    conn = get_db()
-    default_credit = int(get_setting('default_credit_mb', 1024))
-    enable_cumulative = get_setting('enable_cumulative', '1') == '1'
-    
-    if enable_cumulative:
-        # Adiciona crédito diário aos usuários ativos
-        conn.execute('''
-            UPDATE user_credits 
-            SET total_mb = total_mb + ?, 
-                remaining_mb = remaining_mb + ?,
-                last_reset = DATE('now'),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE hotspot_user_id IN (
-                SELECT id FROM hotspot_users WHERE active = 1
-            )
-        ''', (default_credit, default_credit))
-    else:
-        # Reset diário sem acumular
-        conn.execute('''
-            UPDATE user_credits 
-            SET total_mb = ?, 
-                remaining_mb = ?,
-                used_mb = 0,
-                last_reset = DATE('now'),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE hotspot_user_id IN (
-                SELECT id FROM hotspot_users WHERE active = 1
-            )
-        ''', (default_credit, default_credit))
-    
-    conn.commit()
-    conn.close()
-
 @app.route('/')
 def index():
-    """Página inicial - redireciona para login ou dashboard"""
-    if check_auth():
+    if 'user_id' in session:
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Página de login"""
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
-        password = request.form.get('password', '').strip()
+        username = request.form['username']
+        password = request.form['password']
         
-        if not email or not password:
-            flash('Email e senha são obrigatórios', 'error')
-            return render_template('login.html')
-        
-        conn = get_db()
-        user = conn.execute(
-            'SELECT * FROM system_users WHERE email = ? AND password = ? AND active = 1',
-            (email, password)
-        ).fetchone()
-        conn.close()
-        
-        if user:
-            session.permanent = True
-            session['user_id'] = user['id']
-            session['email'] = user['email']
-            session['name'] = user['name']
-            session['role'] = user['role']
-            session['login_time'] = datetime.now().isoformat()
+        try:
+            conn = get_db()
+            cursor = conn.cursor()
             
-            flash(f'Bem-vindo, {user["name"]}!', 'success')
-            return redirect(url_for('dashboard'))
-        else:
-            flash('Email ou senha incorretos', 'error')
+            # Hash da senha
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+            
+            cursor.execute('''
+                SELECT id, username, name, role FROM users 
+                WHERE username = ? AND password = ?
+            ''', (username, password_hash))
+            
+            user = cursor.fetchone()
+            conn.close()
+            
+            if user:
+                session['user_id'] = user['id']
+                session['username'] = user['username']
+                session['name'] = user['name']
+                session['role'] = user['role']
+                flash('Login realizado com sucesso!', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                flash('Usuário ou senha inválidos!', 'error')
+                
+        except Exception as e:
+            logger.error(f"Erro no login: {e}")
+            flash('Erro interno do servidor!', 'error')
     
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
-    """Logout do usuário"""
     session.clear()
-    flash('Logout realizado com sucesso', 'info')
+    flash('Logout realizado com sucesso!', 'success')
     return redirect(url_for('login'))
 
 @app.route('/dashboard')
-@require_auth
+@login_required
 def dashboard():
-    """Dashboard principal"""
-    conn = get_db()
-    
-    # Estatísticas reais
-    stats = {
-        'total_users': conn.execute('SELECT COUNT(*) as count FROM hotspot_users WHERE active = 1').fetchone()['count'],
-        'active_companies': conn.execute('SELECT COUNT(*) as count FROM companies WHERE active = 1').fetchone()['count'],
-        'total_profiles': conn.execute('SELECT COUNT(*) as count FROM hotspot_profiles WHERE active = 1').fetchone()['count'],
-        'total_credits_mb': conn.execute('SELECT SUM(remaining_mb) as total FROM user_credits').fetchone()['total'] or 0
-    }
-    
-    # Atividades recentes
-    activities = conn.execute('''
-        SELECT 'user' as type, 'Novo usuário cadastrado' as title, 
-               full_name || ' - ' || datetime(created_at, 'localtime') as description
-        FROM hotspot_users 
-        WHERE active = 1 
-        ORDER BY created_at DESC 
-        LIMIT 5
-    ''').fetchall()
-    
-    conn.close()
-    
-    user_data = {
-        'name': session.get('name'),
-        'email': session.get('email'),
-        'role': session.get('role')
-    }
-    
-    return render_template('dashboard.html', user=user_data, stats=stats, activities=activities)
-
-@app.route('/users', methods=['GET', 'POST'])
-@require_auth
-def users():
-    """Página de usuários do sistema"""
-    if request.method == 'POST':
-        name = request.form.get('name')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        role = request.form.get('role', 'user')
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
         
-        if not all([name, email, password]):
-            flash('Todos os campos são obrigatórios', 'error')
-        else:
-            conn = get_db()
-            try:
-                conn.execute('''
-                    INSERT INTO system_users (id, email, password, name, role)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (str(uuid.uuid4()), email, password, name, role))
-                conn.commit()
-                flash('Usuário cadastrado com sucesso!', 'success')
-            except sqlite3.IntegrityError:
-                flash('Email já existe no sistema', 'error')
-            finally:
-                conn.close()
+        # Estatísticas gerais
+        cursor.execute("SELECT COUNT(*) as total FROM companies")
+        total_companies = cursor.fetchone()['total']
         
-        return redirect(url_for('users'))
-    
-    # Buscar usuários
-    conn = get_db()
-    users_list = conn.execute('''
-        SELECT * FROM system_users 
-        WHERE active = 1 
-        ORDER BY created_at DESC
-    ''').fetchall()
-    conn.close()
-    
-    return render_template('users.html', user={'name': session.get('name')}, users_list=users_list)
+        cursor.execute("SELECT COUNT(*) as total FROM hotspot_users")
+        total_hotspot_users = cursor.fetchone()['total']
+        
+        cursor.execute("SELECT COUNT(*) as total FROM hotspot_profiles")
+        total_profiles = cursor.fetchone()['total']
+        
+        cursor.execute("SELECT COALESCE(SUM(credits_mb), 0) as total FROM hotspot_users")
+        total_credits = cursor.fetchone()['total']
+        
+        conn.close()
+        
+        stats = {
+            'total_companies': total_companies,
+            'total_hotspot_users': total_hotspot_users,
+            'total_profiles': total_profiles,
+            'total_credits_mb': total_credits
+        }
+        
+        return render_template('dashboard.html', stats=stats, user={'name': session.get('name')})
+        
+    except Exception as e:
+        logger.error(f"Erro no dashboard: {e}")
+        flash('Erro ao carregar dashboard!', 'error')
+        return render_template('dashboard.html', stats={}, user={'name': session.get('name')})
 
 @app.route('/companies', methods=['GET', 'POST'])
-@require_auth
+@login_required
 def companies():
-    """Página de empresas"""
     if request.method == 'POST':
-        name = request.form.get('name')
-        mikrotik_ip = request.form.get('mikrotik_ip')
-        mikrotik_port = request.form.get('mikrotik_port', 8728)
-        mikrotik_user = request.form.get('mikrotik_user')
-        mikrotik_password = request.form.get('mikrotik_password')
-        
-        if not all([name, mikrotik_ip, mikrotik_user, mikrotik_password]):
-            flash('Todos os campos são obrigatórios', 'error')
-        else:
+        try:
+            # Obter dados do formulário
+            name = request.form.get('name', '').strip()
+            mikrotik_ip = request.form.get('mikrotik_ip', '').strip()
+            mikrotik_username = request.form.get('mikrotik_username', '').strip()
+            mikrotik_password = request.form.get('mikrotik_password', '').strip()
+            api_port = request.form.get('api_port', '8728').strip()
+            
+            logger.debug(f"Dados recebidos: name={name}, ip={mikrotik_ip}, user={mikrotik_username}, port={api_port}")
+            
+            # Validar campos obrigatórios
+            if not all([name, mikrotik_ip, mikrotik_username, mikrotik_password]):
+                flash('Todos os campos são obrigatórios!', 'error')
+                return redirect(url_for('companies'))
+            
+            # Validar porta
+            try:
+                api_port = int(api_port)
+            except ValueError:
+                flash('Porta da API deve ser um número válido!', 'error')
+                return redirect(url_for('companies'))
+            
             conn = get_db()
-            conn.execute('''
-                INSERT INTO companies (id, name, mikrotik_ip, mikrotik_port, mikrotik_user, mikrotik_password)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (str(uuid.uuid4()), name, mikrotik_ip, int(mikrotik_port), mikrotik_user, mikrotik_password))
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO companies (name, mikrotik_ip, mikrotik_username, mikrotik_password, api_port)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (name, mikrotik_ip, mikrotik_username, mikrotik_password, api_port))
+            
             conn.commit()
             conn.close()
+            
             flash('Empresa cadastrada com sucesso!', 'success')
+            return redirect(url_for('companies'))
+            
+        except Exception as e:
+            logger.error(f"Erro ao cadastrar empresa: {e}")
+            flash('Erro ao cadastrar empresa!', 'error')
+    
+    # Listar empresas
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM companies ORDER BY created_at DESC')
+        companies_list = cursor.fetchall()
+        conn.close()
         
-        return redirect(url_for('companies'))
-    
-    # Buscar empresas
-    conn = get_db()
-    companies_list = conn.execute('''
-        SELECT *, 
-               (SELECT COUNT(*) FROM hotspot_users WHERE company_id = companies.id AND active = 1) as user_count
-        FROM companies 
-        WHERE active = 1 
-        ORDER BY created_at DESC
-    ''').fetchall()
-    conn.close()
-    
-    return render_template('companies.html', user={'name': session.get('name')}, companies_list=companies_list)
+        return render_template('companies.html', companies=companies_list, user={'name': session.get('name')})
+        
+    except Exception as e:
+        logger.error(f"Erro ao listar empresas: {e}")
+        return render_template('companies.html', companies=[], user={'name': session.get('name')})
 
 @app.route('/profiles', methods=['GET', 'POST'])
-@require_auth
+@login_required
 def profiles():
-    """Página de perfis hotspot"""
     if request.method == 'POST':
-        company_id = request.form.get('company_id')
-        name = request.form.get('name')
-        download_limit = request.form.get('download_limit')
-        upload_limit = request.form.get('upload_limit')
-        time_limit = request.form.get('time_limit')
-        
-        if not all([company_id, name, download_limit, upload_limit]):
-            flash('Campos obrigatórios não preenchidos', 'error')
-        else:
+        try:
+            company_id = request.form.get('company_id')
+            name = request.form.get('name')
+            rate_limit = request.form.get('rate_limit')
+            session_timeout = request.form.get('session_timeout')
+            idle_timeout = request.form.get('idle_timeout')
+            
+            if not all([company_id, name]):
+                flash('Empresa e nome são obrigatórios!', 'error')
+                return redirect(url_for('profiles'))
+            
             conn = get_db()
-            conn.execute('''
-                INSERT INTO hotspot_profiles (id, company_id, name, download_limit, upload_limit, time_limit)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (str(uuid.uuid4()), company_id, name, int(download_limit), int(upload_limit), 
-                  int(time_limit) if time_limit else None))
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO hotspot_profiles (company_id, name, rate_limit, session_timeout, idle_timeout)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (company_id, name, rate_limit, session_timeout or None, idle_timeout or None))
+            
             conn.commit()
             conn.close()
+            
             flash('Perfil criado com sucesso!', 'success')
+            return redirect(url_for('profiles'))
+            
+        except Exception as e:
+            logger.error(f"Erro ao criar perfil: {e}")
+            flash('Erro ao criar perfil!', 'error')
+    
+    # Listar perfis e empresas
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
         
-        return redirect(url_for('profiles'))
-    
-    conn = get_db()
-    profiles_list = conn.execute('''
-        SELECT p.*, c.name as company_name
-        FROM hotspot_profiles p
-        JOIN companies c ON p.company_id = c.id
-        WHERE p.active = 1
-        ORDER BY p.created_at DESC
-    ''').fetchall()
-    
-    companies_list = conn.execute('SELECT * FROM companies WHERE active = 1').fetchall()
-    conn.close()
-    
-    return render_template('profiles.html', 
-                         user={'name': session.get('name')}, 
-                         profiles_list=profiles_list,
-                         companies_list=companies_list)
+        cursor.execute('''
+            SELECT p.*, c.name as company_name 
+            FROM hotspot_profiles p 
+            JOIN companies c ON p.company_id = c.id 
+            ORDER BY p.created_at DESC
+        ''')
+        profiles_list = cursor.fetchall()
+        
+        cursor.execute('SELECT * FROM companies ORDER BY name')
+        companies_list = cursor.fetchall()
+        
+        conn.close()
+        
+        return render_template('profiles.html', profiles=profiles_list, companies=companies_list, user={'name': session.get('name')})
+        
+    except Exception as e:
+        logger.error(f"Erro ao listar perfis: {e}")
+        return render_template('profiles.html', profiles=[], companies=[], user={'name': session.get('name')})
 
 @app.route('/hotspot-users', methods=['GET', 'POST'])
-@require_auth
+@login_required
 def hotspot_users():
-    """Página de usuários hotspot"""
     if request.method == 'POST':
-        company_id = request.form.get('company_id')
-        profile_id = request.form.get('profile_id')
-        username = request.form.get('username')
-        password = request.form.get('password')
-        full_name = request.form.get('full_name')
-        email = request.form.get('email')
-        phone = request.form.get('phone')
-        
-        if not all([company_id, username, password]):
-            flash('Campos obrigatórios não preenchidos', 'error')
-        else:
+        try:
+            company_id = request.form.get('company_id')
+            profile_id = request.form.get('profile_id')
+            username = request.form.get('username')
+            password = request.form.get('password')
+            credits_mb = request.form.get('credits_mb', '0')
+            expiry_date = request.form.get('expiry_date')
+            
+            if not all([company_id, username, password]):
+                flash('Empresa, usuário e senha são obrigatórios!', 'error')
+                return redirect(url_for('hotspot_users'))
+            
             conn = get_db()
-            try:
-                user_id = str(uuid.uuid4())
-                conn.execute('''
-                    INSERT INTO hotspot_users (id, company_id, profile_id, username, password, full_name, email, phone)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (user_id, company_id, profile_id, username, password, full_name, email, phone))
-                
-                # Criar crédito inicial
-                default_credit = int(get_setting('default_credit_mb', 1024))
-                conn.execute('''
-                    INSERT INTO user_credits (id, hotspot_user_id, total_mb, remaining_mb, last_reset)
-                    VALUES (?, ?, ?, ?, DATE('now'))
-                ''', (str(uuid.uuid4()), user_id, default_credit, default_credit))
-                
-                conn.commit()
-                flash('Usuário hotspot criado com sucesso!', 'success')
-            except sqlite3.IntegrityError:
-                flash('Username já existe', 'error')
-            finally:
-                conn.close()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO hotspot_users (company_id, profile_id, username, password, credits_mb, expiry_date)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (company_id, profile_id or None, username, password, int(credits_mb or 0), expiry_date or None))
+            
+            conn.commit()
+            conn.close()
+            
+            flash('Usuário hotspot criado com sucesso!', 'success')
+            return redirect(url_for('hotspot_users'))
+            
+        except Exception as e:
+            logger.error(f"Erro ao criar usuário hotspot: {e}")
+            flash('Erro ao criar usuário hotspot!', 'error')
+    
+    # Listar usuários hotspot
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
         
-        return redirect(url_for('hotspot_users'))
-    
-    conn = get_db()
-    hotspot_users_list = conn.execute('''
-        SELECT hu.*, c.name as company_name, p.name as profile_name,
-               uc.total_mb, uc.used_mb, uc.remaining_mb
-        FROM hotspot_users hu
-        JOIN companies c ON hu.company_id = c.id
-        LEFT JOIN hotspot_profiles p ON hu.profile_id = p.id
-        LEFT JOIN user_credits uc ON hu.id = uc.hotspot_user_id
-        WHERE hu.active = 1
-        ORDER BY hu.created_at DESC
-    ''').fetchall()
-    
-    companies_list = conn.execute('SELECT * FROM companies WHERE active = 1').fetchall()
-    profiles_list = conn.execute('SELECT * FROM hotspot_profiles WHERE active = 1').fetchall()
-    conn.close()
-    
-    return render_template('hotspot_users.html', 
-                         user={'name': session.get('name')}, 
-                         hotspot_users_list=hotspot_users_list,
-                         companies_list=companies_list,
-                         profiles_list=profiles_list)
+        cursor.execute('''
+            SELECT h.*, c.name as company_name, p.name as profile_name 
+            FROM hotspot_users h 
+            JOIN companies c ON h.company_id = c.id 
+            LEFT JOIN hotspot_profiles p ON h.profile_id = p.id 
+            ORDER BY h.created_at DESC
+        ''')
+        hotspot_users_list = cursor.fetchall()
+        
+        cursor.execute('SELECT * FROM companies ORDER BY name')
+        companies_list = cursor.fetchall()
+        
+        cursor.execute('SELECT * FROM hotspot_profiles ORDER BY name')
+        profiles_list = cursor.fetchall()
+        
+        conn.close()
+        
+        return render_template('hotspot_users.html', 
+                             hotspot_users=hotspot_users_list, 
+                             companies=companies_list, 
+                             profiles=profiles_list,
+                             user={'name': session.get('name')})
+        
+    except Exception as e:
+        logger.error(f"Erro ao listar usuários hotspot: {e}")
+        return render_template('hotspot_users.html', hotspot_users=[], companies=[], profiles=[], user={'name': session.get('name')})
 
-@app.route('/credits')
-@require_auth
+@app.route('/credits', methods=['GET', 'POST'])
+@login_required
 def credits():
-    """Página de créditos"""
-    conn = get_db()
+    if request.method == 'POST':
+        try:
+            hotspot_user_id = request.form.get('hotspot_user_id')
+            amount_mb = request.form.get('amount_mb')
+            description = request.form.get('description', '')
+            
+            if not all([hotspot_user_id, amount_mb]):
+                flash('Usuário e quantidade são obrigatórios!', 'error')
+                return redirect(url_for('credits'))
+            
+            conn = get_db()
+            cursor = conn.cursor()
+            
+            # Adicionar crédito
+            cursor.execute('''
+                INSERT INTO credits (hotspot_user_id, amount_mb, description)
+                VALUES (?, ?, ?)
+            ''', (hotspot_user_id, int(amount_mb), description))
+            
+            # Atualizar total de créditos do usuário
+            cursor.execute('''
+                UPDATE hotspot_users 
+                SET credits_mb = credits_mb + ? 
+                WHERE id = ?
+            ''', (int(amount_mb), hotspot_user_id))
+            
+            conn.commit()
+            conn.close()
+            
+            flash('Créditos adicionados com sucesso!', 'success')
+            return redirect(url_for('credits'))
+            
+        except Exception as e:
+            logger.error(f"Erro ao adicionar créditos: {e}")
+            flash('Erro ao adicionar créditos!', 'error')
     
-    # Estatísticas de créditos
-    stats = {
-        'total_credits_mb': conn.execute('SELECT SUM(total_mb) as total FROM user_credits').fetchone()['total'] or 0,
-        'used_credits_mb': conn.execute('SELECT SUM(used_mb) as total FROM user_credits').fetchone()['total'] or 0,
-        'remaining_credits_mb': conn.execute('SELECT SUM(remaining_mb) as total FROM user_credits').fetchone()['total'] or 0,
-        'active_users': conn.execute('SELECT COUNT(*) as count FROM hotspot_users WHERE active = 1').fetchone()['count']
-    }
-    
-    # Lista de créditos por usuário
-    credits_list = conn.execute('''
-        SELECT hu.username, hu.full_name, c.name as company_name,
-               uc.total_mb, uc.used_mb, uc.remaining_mb, uc.last_reset, uc.updated_at
-        FROM user_credits uc
-        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
-        JOIN companies c ON hu.company_id = c.id
-        WHERE hu.active = 1
-        ORDER BY uc.updated_at DESC
-    ''').fetchall()
-    
-    conn.close()
-    
-    return render_template('credits.html', 
-                         user={'name': session.get('name')}, 
-                         stats=stats,
-                         credits_list=credits_list)
+    # Listar créditos
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT c.*, h.username, comp.name as company_name 
+            FROM credits c 
+            JOIN hotspot_users h ON c.hotspot_user_id = h.id 
+            JOIN companies comp ON h.company_id = comp.id 
+            ORDER BY c.created_at DESC
+        ''')
+        credits_list = cursor.fetchall()
+        
+        cursor.execute('''
+            SELECT h.*, c.name as company_name 
+            FROM hotspot_users h 
+            JOIN companies c ON h.company_id = c.id 
+            ORDER BY h.username
+        ''')
+        hotspot_users_list = cursor.fetchall()
+        
+        # Calcular estatísticas
+        cursor.execute("SELECT COALESCE(SUM(credits_mb), 0) as total FROM hotspot_users")
+        total_credits = cursor.fetchone()['total']
+        
+        cursor.execute("SELECT COUNT(*) as total FROM credits")
+        total_transactions = cursor.fetchone()['total']
+        
+        conn.close()
+        
+        stats = {
+            'total_credits_mb': total_credits,
+            'total_transactions': total_transactions
+        }
+        
+        return render_template('credits.html', 
+                             credits=credits_list, 
+                             hotspot_users=hotspot_users_list,
+                             stats=stats,
+                             user={'name': session.get('name')})
+        
+    except Exception as e:
+        logger.error(f"Erro ao listar créditos: {e}")
+        return render_template('credits.html', credits=[], hotspot_users=[], stats={}, user={'name': session.get('name')})
 
 @app.route('/reports')
-@require_auth
+@login_required
 def reports():
-    """Página de relatórios"""
-    return render_template('reports.html', user={'name': session.get('name')})
-
-@app.route('/settings', methods=['GET', 'POST'])
-@require_auth
-def settings():
-    """Página de configurações"""
-    if request.method == 'POST':
-        conn = get_db()
-        
-        # Atualizar configurações
-        settings_to_update = [
-            ('default_credit_mb', request.form.get('default_credit_mb')),
-            ('credit_reset_time', request.form.get('credit_reset_time')),
-            ('enable_cumulative', '1' if request.form.get('enable_cumulative') else '0'),
-            ('system_timezone', request.form.get('system_timezone'))
-        ]
-        
-        for key, value in settings_to_update:
-            if value is not None:
-                conn.execute('''
-                    UPDATE system_settings 
-                    SET value = ?, updated_at = CURRENT_TIMESTAMP 
-                    WHERE key = ?
-                ''', (value, key))
-        
-        conn.commit()
-        conn.close()
-        flash('Configurações salvas com sucesso!', 'success')
-        return redirect(url_for('settings'))
-    
-    # Buscar configurações atuais
-    conn = get_db()
-    current_settings = {}
-    settings_rows = conn.execute('SELECT key, value FROM system_settings').fetchall()
-    for row in settings_rows:
-        current_settings[row['key']] = row['value']
-    conn.close()
-    
-    return render_template('settings.html', 
-                         user={'name': session.get('name')},
-                         settings=current_settings)
-
-# API Routes
-@app.route('/api/health')
-def api_health():
-    """Health check da API"""
-    return jsonify({
-        'status': 'ok',
-        'message': 'MikroTik Manager API funcionando',
-        'timestamp': datetime.now().isoformat()
-    })
-
-@app.route('/api/update-credits', methods=['POST'])
-@require_auth
-def api_update_credits():
-    """API para atualizar créditos cumulativos"""
     try:
-        update_credits_cumulative()
-        return jsonify({'status': 'success', 'message': 'Créditos atualizados'})
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Relatório de empresas
+        cursor.execute('''
+            SELECT c.name, COUNT(h.id) as total_users, COALESCE(SUM(h.credits_mb), 0) as total_credits
+            FROM companies c
+            LEFT JOIN hotspot_users h ON c.id = h.company_id
+            GROUP BY c.id, c.name
+            ORDER BY total_users DESC
+        ''')
+        companies_report = cursor.fetchall()
+        
+        # Relatório de perfis mais usados
+        cursor.execute('''
+            SELECT p.name, COUNT(h.id) as usage_count
+            FROM hotspot_profiles p
+            LEFT JOIN hotspot_users h ON p.id = h.profile_id
+            GROUP BY p.id, p.name
+            ORDER BY usage_count DESC
+            LIMIT 10
+        ''')
+        profiles_report = cursor.fetchall()
+        
+        # Relatório de créditos por mês
+        cursor.execute('''
+            SELECT strftime('%Y-%m', created_at) as month, SUM(amount_mb) as total_credits
+            FROM credits
+            GROUP BY strftime('%Y-%m', created_at)
+            ORDER BY month DESC
+            LIMIT 12
+        ''')
+        credits_monthly = cursor.fetchall()
+        
+        conn.close()
+        
+        return render_template('reports.html', 
+                             companies_report=companies_report,
+                             profiles_report=profiles_report,
+                             credits_monthly=credits_monthly,
+                             user={'name': session.get('name')})
+        
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+        logger.error(f"Erro ao gerar relatórios: {e}")
+        return render_template('reports.html', 
+                             companies_report=[], 
+                             profiles_report=[], 
+                             credits_monthly=[],
+                             user={'name': session.get('name')})
+
+@app.route('/settings')
+@login_required
+def settings():
+    return render_template('settings.html', user={'name': session.get('name')})
+
+@app.route('/users')
+@login_required
+def users():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, username, name, email, role, created_at FROM users ORDER BY created_at DESC')
+        users_list = cursor.fetchall()
+        conn.close()
+        
+        return render_template('users.html', users=users_list, user={'name': session.get('name')})
+        
+    except Exception as e:
+        logger.error(f"Erro ao listar usuários: {e}")
+        return render_template('users.html', users=[], user={'name': session.get('name')})
 
 if __name__ == '__main__':
     init_db()
-    print("🚀 Iniciando MikroTik Manager Flask...")
-    print("📧 Login: admin@demo.com")
-    print("🔑 Senha: admin123")
-    print("🌐 URL: http://localhost:5000")
-    print("💾 Banco: mikrotik_manager.db")
     app.run(host='0.0.0.0', port=5000, debug=True)
