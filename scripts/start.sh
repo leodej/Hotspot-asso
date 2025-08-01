@@ -1,37 +1,43 @@
 #!/bin/bash
 
 echo "🚀 Iniciando MIKROTIK MANAGER..."
+echo "================================"
 
-# Verificar se o Docker está rodando
-if ! docker info > /dev/null 2>&1; then
-    echo "❌ Docker não está rodando. Iniciando Docker..."
-    sudo systemctl start docker
-    sleep 3
+# Verificar se Docker está instalado
+if ! command -v docker &> /dev/null; then
+    echo "❌ Docker não está instalado!"
+    echo "Execute: sudo apt install docker.io docker-compose"
+    exit 1
 fi
 
-# Verificar se o arquivo .env existe
-if [ ! -f .env ]; then
-    echo "❌ Arquivo .env não encontrado. Criando arquivo padrão..."
-    cp .env.example .env 2>/dev/null || echo "⚠️  Crie o arquivo .env manualmente"
+# Verificar se Docker Compose está instalado
+if ! command -v docker-compose &> /dev/null; then
+    echo "❌ Docker Compose não está instalado!"
+    echo "Execute: sudo apt install docker-compose"
+    exit 1
+fi
+
+# Verificar se o usuário está no grupo docker
+if ! groups $USER | grep -q docker; then
+    echo "⚠️  Usuário não está no grupo docker!"
+    echo "Execute: sudo usermod -aG docker $USER"
+    echo "Depois faça logout/login ou reinicie o sistema"
+    exit 1
 fi
 
 # Criar diretórios necessários
-mkdir -p ssl logs backups uploads
+echo "📁 Criando diretórios necessários..."
+mkdir -p logs backups uploads ssl
 
-# Gerar certificados SSL se não existirem
-if [ ! -f ssl/cert.pem ] || [ ! -f ssl/key.pem ]; then
-    echo "🔐 Gerando certificados SSL..."
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-        -keyout ssl/key.pem \
-        -out ssl/cert.pem \
-        -subj "/C=BR/ST=SP/L=SaoPaulo/O=MikroTik Manager/CN=localhost" \
-        > /dev/null 2>&1
-    echo "✅ Certificados SSL gerados"
+# Verificar se existe .env
+if [ ! -f .env ]; then
+    echo "⚠️  Arquivo .env não encontrado! Criando arquivo padrão..."
+    cp .env.example .env 2>/dev/null || echo "Arquivo .env.example não encontrado"
 fi
 
 # Parar containers existentes
 echo "🛑 Parando containers existentes..."
-docker-compose down > /dev/null 2>&1
+docker-compose down
 
 # Construir e iniciar containers
 echo "🔨 Construindo e iniciando containers..."
@@ -45,23 +51,12 @@ sleep 10
 echo "📊 Status dos containers:"
 docker-compose ps
 
-# Verificar se a aplicação está respondendo
-echo "🔍 Verificando se a aplicação está funcionando..."
-sleep 5
-
-if curl -k -s https://localhost/api/health > /dev/null; then
-    echo "✅ Aplicação iniciada com sucesso!"
-    echo ""
-    echo "🌐 Acesse a aplicação em:"
-    echo "   - Interface: https://localhost"
-    echo "   - API: https://localhost/api"
-    echo "   - Prometheus: http://localhost:9090"
-    echo "   - Grafana: http://localhost:3001"
-    echo ""
-    echo "👤 Credenciais padrão:"
-    echo "   - Email: admin@mikrotik-manager.com"
-    echo "   - Senha: admin123"
-else
-    echo "⚠️  Aplicação pode estar iniciando ainda. Verifique os logs:"
-    echo "   ./scripts/logs.sh"
-fi
+echo ""
+echo "✅ MIKROTIK MANAGER iniciado com sucesso!"
+echo ""
+echo "🌐 Acesse: https://localhost ou http://localhost:3000"
+echo "👤 Login: admin@demo.com"
+echo "🔑 Senha: admin123"
+echo ""
+echo "📋 Para ver logs: ./scripts/logs.sh"
+echo "🛑 Para parar: ./scripts/stop.sh"

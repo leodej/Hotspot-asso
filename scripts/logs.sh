@@ -3,9 +3,11 @@
 SERVICE=${1:-""}
 
 if [ -z "$SERVICE" ]; then
-    echo "📋 Mostrando logs de todos os serviços..."
-    docker-compose logs -f --tail=100
+    echo "📋 Logs de todos os serviços:"
+    echo "============================"
+    docker-compose logs -f --tail=50
 else
-    echo "📋 Mostrando logs do serviço: $SERVICE"
-    docker-compose logs -f --tail=100 $SERVICE
+    echo "📋 Logs do serviço: $SERVICE"
+    echo "============================"
+    docker-compose logs -f --tail=50 $SERVICE
 fi
