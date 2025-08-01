@@ -54,14 +54,7 @@ export default function CompaniesPage() {
   })
 
   useEffect(() => {
-    fetchCompanies().then(() => {
-      // Testar conexões automaticamente após carregar as empresas
-      companies.forEach((company) => {
-        if (company.active) {
-          testConnection(company.id)
-        }
-      })
-    })
+    fetchCompanies()
   }, [])
 
   const fetchCompanies = async () => {
@@ -130,7 +123,6 @@ export default function CompaniesPage() {
 
   const testConnection = async (id: string) => {
     try {
-      console.log(`Testando conexão para empresa ID: ${id}`)
       setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, connectionStatus: "testing" } : c)))
 
       const response = await fetch(`/api/companies/${id}/test-connection`, {
@@ -138,7 +130,6 @@ export default function CompaniesPage() {
       })
 
       const result = await response.json()
-      console.log(`Resultado do teste para empresa ${id}:`, result)
 
       setCompanies((prev) =>
         prev.map((c) =>
@@ -190,154 +181,138 @@ export default function CompaniesPage() {
             <p className="text-muted-foreground">Gerencie as empresas e suas configurações MikroTik</p>
           </div>
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                companies.forEach((company) => {
-                  if (company.active) {
-                    testConnection(company.id)
-                  }
-                })
-              }}
-            >
-              <TestTube className="mr-2 h-4 w-4" />
-              Testar Todas Conexões
-            </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nova Empresa
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{editingCompany ? "Editar Empresa" : "Nova Empresa"}</DialogTitle>
+                <DialogDescription>Configure os dados da empresa e conexão com MikroTik</DialogDescription>
+              </DialogHeader>
 
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nova Empresa
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>{editingCompany ? "Editar Empresa" : "Nova Empresa"}</DialogTitle>
-                  <DialogDescription>Configure os dados da empresa e conexão com MikroTik</DialogDescription>
-                </DialogHeader>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Nome da Empresa</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="mikrotikIp">IP do MikroTik</Label>
-                      <Input
-                        id="mikrotikIp"
-                        value={formData.mikrotikIp}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, mikrotikIp: e.target.value }))}
-                        placeholder="192.168.1.1"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="mikrotikPort">Porta</Label>
-                      <Input
-                        id="mikrotikPort"
-                        type="number"
-                        value={formData.mikrotikPort}
-                        onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, mikrotikPort: Number.parseInt(e.target.value) }))
-                        }
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="mikrotikUser">Usuário</Label>
-                      <Input
-                        id="mikrotikUser"
-                        value={formData.mikrotikUser}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, mikrotikUser: e.target.value }))}
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="mikrotikPassword">Senha</Label>
-                      <Input
-                        id="mikrotikPassword"
-                        type="password"
-                        value={formData.mikrotikPassword}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, mikrotikPassword: e.target.value }))}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="defaultDownload">Download Padrão (Mbps)</Label>
-                      <Input
-                        id="defaultDownload"
-                        type="number"
-                        value={formData.defaultDownload}
-                        onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, defaultDownload: Number.parseInt(e.target.value) }))
-                        }
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="defaultUpload">Upload Padrão (Mbps)</Label>
-                      <Input
-                        id="defaultUpload"
-                        type="number"
-                        value={formData.defaultUpload}
-                        onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, defaultUpload: Number.parseInt(e.target.value) }))
-                        }
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="defaultTime">Tempo Padrão (min)</Label>
-                      <Input
-                        id="defaultTime"
-                        type="number"
-                        value={formData.defaultTime}
-                        onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, defaultTime: Number.parseInt(e.target.value) }))
-                        }
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="active"
-                      checked={formData.active}
-                      onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, active: checked }))}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nome da Empresa</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                      required
                     />
-                    <Label htmlFor="active">Empresa Ativa</Label>
                   </div>
 
-                  <div className="flex justify-end space-x-2">
-                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                      Cancelar
-                    </Button>
-                    <Button type="submit">{editingCompany ? "Atualizar" : "Criar"}</Button>
+                  <div className="space-y-2">
+                    <Label htmlFor="mikrotikIp">IP do MikroTik</Label>
+                    <Input
+                      id="mikrotikIp"
+                      value={formData.mikrotikIp}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, mikrotikIp: e.target.value }))}
+                      placeholder="192.168.1.1"
+                      required
+                    />
                   </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="mikrotikPort">Porta</Label>
+                    <Input
+                      id="mikrotikPort"
+                      type="number"
+                      value={formData.mikrotikPort}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, mikrotikPort: Number.parseInt(e.target.value) }))
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="mikrotikUser">Usuário</Label>
+                    <Input
+                      id="mikrotikUser"
+                      value={formData.mikrotikUser}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, mikrotikUser: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="mikrotikPassword">Senha</Label>
+                    <Input
+                      id="mikrotikPassword"
+                      type="password"
+                      value={formData.mikrotikPassword}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, mikrotikPassword: e.target.value }))}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="defaultDownload">Download Padrão (Mbps)</Label>
+                    <Input
+                      id="defaultDownload"
+                      type="number"
+                      value={formData.defaultDownload}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, defaultDownload: Number.parseInt(e.target.value) }))
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="defaultUpload">Upload Padrão (Mbps)</Label>
+                    <Input
+                      id="defaultUpload"
+                      type="number"
+                      value={formData.defaultUpload}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, defaultUpload: Number.parseInt(e.target.value) }))
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="defaultTime">Tempo Padrão (min)</Label>
+                    <Input
+                      id="defaultTime"
+                      type="number"
+                      value={formData.defaultTime}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, defaultTime: Number.parseInt(e.target.value) }))
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="active"
+                    checked={formData.active}
+                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, active: checked }))}
+                  />
+                  <Label htmlFor="active">Empresa Ativa</Label>
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit">{editingCompany ? "Atualizar" : "Criar"}</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <Card>
@@ -407,13 +382,19 @@ export default function CompaniesPage() {
                           size="sm"
                           onClick={() => testConnection(company.id)}
                           disabled={company.connectionStatus === "testing"}
+                          title="Testar Conexão"
                         >
                           <TestTube className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(company)}>
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(company)} title="Editar Empresa">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDelete(company.id)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(company.id)}
+                          title="Excluir Empresa"
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
