@@ -72,6 +72,9 @@ export default function CreditsPage() {
     accumulative: false,
   })
 
+  const [selectedCompany, setSelectedCompany] = useState<string>("all")
+  const [selectedMonth, setSelectedMonth] = useState<string>("all")
+
   useEffect(() => {
     fetchCredits()
     fetchHotspotUsers()
@@ -253,6 +256,35 @@ export default function CreditsPage() {
     }
   }
 
+  const getUniqueCompanies = () => {
+    const companies = [...new Set(credits.map((credit) => credit.companyName))]
+    return companies.sort()
+  }
+
+  const getAvailableMonths = () => {
+    const months = [
+      ...new Set(
+        credits.map((credit) => {
+          const date = new Date(credit.createdAt)
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+        }),
+      ),
+    ]
+    return months.sort().reverse()
+  }
+
+  const getFilteredCredits = () => {
+    return credits.filter((credit) => {
+      const companyMatch = selectedCompany === "all" || credit.companyName === selectedCompany
+
+      const creditDate = new Date(credit.createdAt)
+      const creditMonth = `${creditDate.getFullYear()}-${String(creditDate.getMonth() + 1).padStart(2, "0")}`
+      const monthMatch = selectedMonth === "all" || creditMonth === selectedMonth
+
+      return companyMatch && monthMatch
+    })
+  }
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -263,9 +295,11 @@ export default function CreditsPage() {
     )
   }
 
+  const filteredCredits = getFilteredCredits()
+
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Sistema de Créditos</h1>
@@ -440,6 +474,53 @@ export default function CreditsPage() {
           </Dialog>
         </div>
 
+        {/* Filtros */}
+        <div className="flex gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="company-filter">Filtrar por Empresa</Label>
+            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Todas as empresas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as empresas</SelectItem>
+                {getUniqueCompanies().map((company) => (
+                  <SelectItem key={company} value={company}>
+                    {company}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="month-filter">Filtrar por Mês</Label>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Todos os meses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os meses</SelectItem>
+                {getAvailableMonths().map((month) => {
+                  const [year, monthNum] = month.split("-")
+                  const monthName = new Date(Number.parseInt(year), Number.parseInt(monthNum) - 1).toLocaleDateString(
+                    "pt-BR",
+                    {
+                      month: "long",
+                      year: "numeric",
+                    },
+                  )
+                  return (
+                    <SelectItem key={month} value={month}>
+                      {monthName}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         {/* Estatísticas */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
@@ -448,7 +529,7 @@ export default function CreditsPage() {
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{credits.length}</div>
+              <div className="text-2xl font-bold">{filteredCredits.length}</div>
               <p className="text-xs text-muted-foreground">Créditos ativos</p>
             </CardContent>
           </Card>
@@ -459,7 +540,7 @@ export default function CreditsPage() {
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{credits.filter((c) => c.isLowCredit).length}</div>
+              <div className="text-2xl font-bold">{filteredCredits.filter((c) => c.isLowCredit).length}</div>
               <p className="text-xs text-muted-foreground">Abaixo de 20%</p>
             </CardContent>
           </Card>
@@ -470,7 +551,7 @@ export default function CreditsPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{credits.filter((c) => c.isExpired).length}</div>
+              <div className="text-2xl font-bold">{filteredCredits.filter((c) => c.isExpired).length}</div>
               <p className="text-xs text-muted-foreground">Créditos vencidos</p>
             </CardContent>
           </Card>
@@ -481,7 +562,7 @@ export default function CreditsPage() {
               <RefreshCw className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{credits.filter((c) => c.autoReset).length}</div>
+              <div className="text-2xl font-bold">{filteredCredits.filter((c) => c.autoReset).length}</div>
               <p className="text-xs text-muted-foreground">Com reset automático</p>
             </CardContent>
           </Card>
@@ -490,7 +571,7 @@ export default function CreditsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Lista de Créditos</CardTitle>
-            <CardDescription>{credits.length} crédito(s) cadastrado(s)</CardDescription>
+            <CardDescription>{filteredCredits.length} crédito(s) encontrado(s)</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -506,7 +587,7 @@ export default function CreditsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {credits.map((credit) => (
+                {filteredCredits.map((credit) => (
                   <TableRow key={credit.id}>
                     <TableCell>
                       <div>
