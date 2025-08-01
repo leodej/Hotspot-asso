@@ -232,7 +232,13 @@
                             <div class="credit-remaining">{{ hotspot_user.remaining_mb or 0 }} MB restantes</div>
                             <div class="credit-used">{{ hotspot_user.used_mb or 0 }} MB usados</div>
                         </td>
-                        <td><span class="status-badge status-active">Ativo</span></td>
+                        <td>
+                            {% if hotspot_user.active %}
+                                <span class="status-badge status-active">Ativo</span>
+                            {% else %}
+                                <span class="status-badge" style="background: #fee2e2; color: #991b1b;">Desativado</span>
+                            {% endif %}
+                        </td>
                         <td>{{ hotspot_user.created_at }}</td>
                         <td>
                             <button class="btn-primary" style="padding: 0.5rem; font-size: 0.75rem;" onclick="editUser('{{ hotspot_user.id }}', '{{ hotspot_user.username }}', '{{ hotspot_user.full_name or '' }}', '{{ hotspot_user.email or '' }}', '{{ hotspot_user.phone or '' }}', '{{ hotspot_user.turma }}', '{{ hotspot_user.company_id }}', '{{ hotspot_user.profile_id or '' }}')">Editar</button>

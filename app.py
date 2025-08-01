@@ -491,7 +491,6 @@ def hotspot_users():
         JOIN companies c ON hu.company_id = c.id
         LEFT JOIN hotspot_profiles p ON hu.profile_id = p.id
         LEFT JOIN user_credits uc ON hu.id = uc.hotspot_user_id
-        WHERE hu.active = 1
         ORDER BY hu.created_at DESC
     ''').fetchall()
     
