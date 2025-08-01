@@ -202,7 +202,7 @@
                 font-weight: 500;
             }
 
-            .form-input {
+            .form-input, .form-select {
                 width: 100%;
                 padding: 0.75rem;
                 border: 1px solid #d1d5db;
@@ -258,6 +258,45 @@
                 background: #fef3c7;
                 color: #92400e;
             }
+
+            .turma-control {
+                margin-top: 1rem;
+                padding: 1rem;
+                background: #f9fafb;
+                border-radius: 6px;
+                border: 1px solid #e5e7eb;
+            }
+
+            .turma-label {
+                font-size: 0.875rem;
+                font-weight: 500;
+                color: #374151;
+                margin-bottom: 0.5rem;
+            }
+
+            .turma-select {
+                width: 100%;
+                padding: 0.5rem;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                font-size: 0.875rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .turma-btn {
+                background: #f59e0b;
+                color: white;
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.875rem;
+                width: 100%;
+            }
+
+            .turma-btn:hover {
+                background: #d97706;
+            }
         </style>
 
         <div class="action-bar">
@@ -283,19 +322,36 @@
                         <span class="info-value">{{ company.user_count or 0 }}</span>
                     </div>
                     <div class="info-item">
+                        <span class="info-label">Turma Ativa:</span>
+                        <span class="info-value">Turma {{ company.turma_ativa }}</span>
+                    </div>
+                    <div class="info-item">
                         <span class="info-label">Criado em:</span>
                         <span class="info-value">{{ company.created_at }}</span>
                     </div>
                 </div>
+                
+                <div class="turma-control">
+                    <div class="turma-label">Controle de Turma:</div>
+                    <form method="POST" action="/companies/update-turma" style="margin: 0;">
+                        <input type="hidden" name="company_id" value="{{ company.id }}">
+                        <select name="turma_ativa" class="turma-select">
+                            <option value="A" {% if company.turma_ativa == 'A' %}selected{% endif %}>Turma A</option>
+                            <option value="B" {% if company.turma_ativa == 'B' %}selected{% endif %}>Turma B</option>
+                        </select>
+                        <button type="submit" class="turma-btn">Alterar Turma Ativa</button>
+                    </form>
+                </div>
+                
                 <span id="status-{{ company.id }}" class="status-badge status-disconnected">Desconectado</span>
                 <div class="company-actions">
-                    <button class="btn-action btn-test" onclick="testConnection({{ company.id }})" title="Testar Conexão">
+                    <button class="btn-action btn-test" onclick="testConnection('{{ company.id }}')" title="Testar Conexão">
                         🔌 Testar
                     </button>
-                    <button class="btn-action btn-edit" onclick="editCompany({{ company.id }})" title="Editar">
+                    <button class="btn-action btn-edit" onclick="editCompany('{{ company.id }}')" title="Editar">
                         ✏️ Editar
                     </button>
-                    <button class="btn-action btn-delete" onclick="deleteCompany({{ company.id }})" title="Excluir">
+                    <button class="btn-action btn-delete" onclick="deleteCompany('{{ company.id }}')" title="Excluir">
                         🗑️ Excluir
                     </button>
                 </div>
@@ -334,6 +390,13 @@
                     <div class="form-group">
                         <label class="form-label">Senha MikroTik</label>
                         <input type="password" id="companyPassword" name="mikrotik_password" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Turma Ativa</label>
+                        <select name="turma_ativa" id="companyTurma" class="form-select" required>
+                            <option value="A">Turma A</option>
+                            <option value="B">Turma B</option>
+                        </select>
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>

@@ -39,6 +39,7 @@ def init_db():
             mikrotik_port INTEGER DEFAULT 8728,
             mikrotik_user TEXT NOT NULL,
             mikrotik_password TEXT NOT NULL,
+            turma_ativa TEXT DEFAULT 'A',
             active INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -187,6 +188,28 @@ def update_credits_cumulative():
     conn.commit()
     conn.close()
 
+def update_users_by_turma(company_id, turma_ativa):
+    """Ativa/desativa usuários baseado na turma ativa da empresa"""
+    conn = get_db()
+    
+    # Ativar usuários da turma ativa
+    conn.execute('''
+        UPDATE hotspot_users 
+        SET active = 1 
+        WHERE company_id = ? AND turma = ?
+    ''', (company_id, turma_ativa))
+    
+    # Desativar usuários da turma inativa
+    turma_inativa = 'B' if turma_ativa == 'A' else 'A'
+    conn.execute('''
+        UPDATE hotspot_users 
+        SET active = 0 
+        WHERE company_id = ? AND turma = ?
+    ''', (company_id, turma_inativa))
+    
+    conn.commit()
+    conn.close()
+
 @app.route('/')
 def index():
     """Página inicial - redireciona para login ou dashboard"""
@@ -317,15 +340,16 @@ def companies():
         mikrotik_port = request.form.get('mikrotik_port', 8728)
         mikrotik_user = request.form.get('mikrotik_user')
         mikrotik_password = request.form.get('mikrotik_password')
+        turma_ativa = request.form.get('turma_ativa', 'A')
         
         if not all([name, mikrotik_ip, mikrotik_user, mikrotik_password]):
             flash('Todos os campos são obrigatórios', 'error')
         else:
             conn = get_db()
             conn.execute('''
-                INSERT INTO companies (id, name, mikrotik_ip, mikrotik_port, mikrotik_user, mikrotik_password)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (str(uuid.uuid4()), name, mikrotik_ip, int(mikrotik_port), mikrotik_user, mikrotik_password))
+                INSERT INTO companies (id, name, mikrotik_ip, mikrotik_port, mikrotik_user, mikrotik_password, turma_ativa)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (str(uuid.uuid4()), name, mikrotik_ip, int(mikrotik_port), mikrotik_user, mikrotik_password, turma_ativa))
             conn.commit()
             conn.close()
             flash('Empresa cadastrada com sucesso!', 'success')
@@ -344,6 +368,32 @@ def companies():
     conn.close()
     
     return render_template('companies.html', user={'name': session.get('name')}, companies_list=companies_list)
+
+@app.route('/companies/update-turma', methods=['POST'])
+@require_auth
+def update_company_turma():
+    """Atualizar turma ativa da empresa"""
+    company_id = request.form.get('company_id')
+    turma_ativa = request.form.get('turma_ativa')
+    
+    if not all([company_id, turma_ativa]):
+        flash('Dados inválidos', 'error')
+    else:
+        conn = get_db()
+        conn.execute('''
+            UPDATE companies 
+            SET turma_ativa = ? 
+            WHERE id = ?
+        ''', (turma_ativa, company_id))
+        conn.commit()
+        conn.close()
+        
+        # Atualizar status dos usuários baseado na nova turma ativa
+        update_users_by_turma(company_id, turma_ativa)
+        
+        flash(f'Turma ativa atualizada para {turma_ativa}!', 'success')
+    
+    return redirect(url_for('companies'))
 
 @app.route('/profiles', methods=['GET', 'POST'])
 @require_auth
@@ -407,11 +457,15 @@ def hotspot_users():
         else:
             conn = get_db()
             try:
+                # Verificar turma ativa da empresa
+                company = conn.execute('SELECT turma_ativa FROM companies WHERE id = ?', (company_id,)).fetchone()
+                user_active = 1 if company and company['turma_ativa'] == turma else 0
+                
                 user_id = str(uuid.uuid4())
                 conn.execute('''
-                    INSERT INTO hotspot_users (id, company_id, profile_id, username, password, full_name, email, phone, turma)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (user_id, company_id, profile_id, username, password, full_name, email, phone, turma))
+                    INSERT INTO hotspot_users (id, company_id, profile_id, username, password, full_name, email, phone, turma, active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (user_id, company_id, profile_id, username, password, full_name, email, phone, turma, user_active))
                 
                 # Criar crédito inicial
                 default_credit = int(get_setting('default_credit_mb', 1024))
@@ -470,20 +524,24 @@ def edit_hotspot_user():
     else:
         conn = get_db()
         try:
+            # Verificar turma ativa da empresa
+            company = conn.execute('SELECT turma_ativa FROM companies WHERE id = ?', (company_id,)).fetchone()
+            user_active = 1 if company and company['turma_ativa'] == turma else 0
+            
             if password:  # Se senha foi fornecida, atualizar com senha
                 conn.execute('''
                     UPDATE hotspot_users 
                     SET company_id = ?, profile_id = ?, username = ?, password = ?, 
-                        full_name = ?, email = ?, phone = ?, turma = ?
+                        full_name = ?, email = ?, phone = ?, turma = ?, active = ?
                     WHERE id = ?
-                ''', (company_id, profile_id, username, password, full_name, email, phone, turma, user_id))
+                ''', (company_id, profile_id, username, password, full_name, email, phone, turma, user_active, user_id))
             else:  # Se senha não foi fornecida, manter a atual
                 conn.execute('''
                     UPDATE hotspot_users 
                     SET company_id = ?, profile_id = ?, username = ?, 
-                        full_name = ?, email = ?, phone = ?, turma = ?
+                        full_name = ?, email = ?, phone = ?, turma = ?, active = ?
                     WHERE id = ?
-                ''', (company_id, profile_id, username, full_name, email, phone, turma, user_id))
+                ''', (company_id, profile_id, username, full_name, email, phone, turma, user_active, user_id))
             
             conn.commit()
             flash('Usuário hotspot atualizado com sucesso!', 'success')
