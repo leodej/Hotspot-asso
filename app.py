@@ -448,21 +448,33 @@ def credits():
     conn = get_db()
     if not conn:
         flash('Erro de conexão com banco de dados', 'error')
-        return render_template('credits.html', credits=[], user={'name': session.get('name')})
+        return render_template('credits.html', credits_list=[], stats={}, user={'name': session.get('name')})
     
     try:
+        # Get credits list
         credits_list = conn.execute('''
-            SELECT uc.*, hu.username, c.name as company_name
+            SELECT uc.*, hu.username, hu.password as full_name, c.name as company_name,
+                   (uc.credits_mb - uc.used_mb) as remaining_mb,
+                   uc.credits_mb as total_mb,
+                   uc.used_mb,
+                   uc.last_reset
             FROM user_credits uc
             LEFT JOIN hotspot_users hu ON uc.user_id = hu.id
-            LEFT JOIN companies c ON hu.company_id = c.id
+            LEFT JOIN companies c ON hu.company_id = hu.id
             ORDER BY uc.created_at DESC
         ''').fetchall()
         
-        return render_template('credits.html', credits=credits_list, user={'name': session.get('name')})
+        # Calculate stats
+        stats = {}
+        stats['total_credits_mb'] = sum(row['total_mb'] for row in credits_list) if credits_list else 0
+        stats['used_credits_mb'] = sum(row['used_mb'] for row in credits_list) if credits_list else 0
+        stats['remaining_credits_mb'] = sum(row['remaining_mb'] for row in credits_list) if credits_list else 0
+        stats['active_users'] = len(credits_list)
+        
+        return render_template('credits.html', credits_list=credits_list, stats=stats, user={'name': session.get('name')})
     except Exception as e:
         flash(f'Erro ao carregar créditos: {str(e)}', 'error')
-        return render_template('credits.html', credits=[], user={'name': session.get('name')})
+        return render_template('credits.html', credits_list=[], stats={}, user={'name': session.get('name')})
     finally:
         conn.close()
 
