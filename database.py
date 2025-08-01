@@ -3,13 +3,13 @@ import uuid
 from config import Config
 
 def get_db():
-    """Conecta ao banco de dados"""
+    """Conecta ao banco de dados SQLite"""
     conn = sqlite3.connect(Config.DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """Inicializa o banco de dados com todas as tabelas"""
+    """Inicializa o banco de dados com as tabelas necessárias"""
     conn = sqlite3.connect(Config.DATABASE_PATH)
     cursor = conn.cursor()
     
@@ -21,8 +21,11 @@ def init_db():
             password TEXT NOT NULL,
             name TEXT NOT NULL,
             role TEXT DEFAULT 'user',
+            user_type TEXT DEFAULT 'admin',
+            hotspot_user_id TEXT,
             active INTEGER DEFAULT 1,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (hotspot_user_id) REFERENCES hotspot_users (id)
         )
     ''')
     
@@ -101,9 +104,9 @@ def init_db():
     
     # Inserir usuário admin padrão
     cursor.execute('''
-        INSERT OR IGNORE INTO system_users (id, email, password, name, role)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (str(uuid.uuid4()), 'admin@demo.com', 'admin123', 'Administrador Sistema', 'admin'))
+        INSERT OR IGNORE INTO system_users (id, email, password, name, role, user_type)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (str(uuid.uuid4()), 'admin@demo.com', 'admin123', 'Administrador Sistema', 'admin', 'admin'))
     
     # Inserir configurações padrão
     settings = [

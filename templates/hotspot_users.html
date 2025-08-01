@@ -1,13 +1,29 @@
 {% extends "base.html" %}
 
-{% block page_title %}Usuários Hotspot{% endblock %}
+{% block page_title %}Usuários Hotspot - MikroTik Manager{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4><i class="bi bi-wifi"></i> Usuários Hotspot</h4>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
-        <i class="bi bi-plus-circle"></i> Novo Usuário
-    </button>
+    <div>
+        <h4><i class="bi bi-wifi"></i> Usuários Hotspot</h4>
+        <p class="text-muted">Gerencie usuários de acesso hotspot</p>
+    </div>
+    
+    <div class="d-flex gap-2">
+        <!-- Filtro por Empresa -->
+        <select class="form-select" onchange="filterByCompany(this.value)" style="width: 200px;">
+            <option value="">Todas as Empresas</option>
+            {% for company in companies_list %}
+            <option value="{{ company.id }}" {{ 'selected' if company.id == selected_company }}>
+                {{ company.name }}
+            </option>
+            {% endfor %}
+        </select>
+        
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+            <i class="bi bi-plus-circle"></i> Novo Usuário
+        </button>
+    </div>
 </div>
 
 <div class="card">
@@ -22,30 +38,45 @@
                         <th>Perfil</th>
                         <th>Créditos</th>
                         <th>Status</th>
+                        <th>Login Sistema</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for user_item in hotspot_users_list %}
                     <tr>
-                        <td>{{ user_item.username }}</td>
+                        <td><strong>{{ user_item.username }}</strong></td>
                         <td>{{ user_item.full_name or '-' }}</td>
-                        <td>{{ user_item.company_name }}</td>
+                        <td>
+                            <span class="badge bg-primary">{{ user_item.company_name }}</span>
+                        </td>
                         <td>{{ user_item.profile_name or '-' }}</td>
                         <td>
                             {% if user_item.remaining_mb %}
                                 <div class="d-flex align-items-center">
-                                    <div class="progress me-2" style="width: 100px; height: 6px;">
-                                        <div class="progress-bar" style="width: {{ (user_item.remaining_mb / user_item.total_mb * 100) if user_item.total_mb else 0 }}%"></div>
+                                    <div class="progress me-2" style="width: 80px; height: 6px;">
+                                        <div class="progress-bar bg-success" style="width: {{ (user_item.remaining_mb / user_item.total_mb * 100) if user_item.total_mb else 0 }}%"></div>
                                     </div>
-                                    <small>{{ "%.1f"|format(user_item.remaining_mb / 1024) }} GB</small>
+                                    <small class="text-success">{{ "%.1f"|format(user_item.remaining_mb / 1024) }} GB</small>
                                 </div>
+                                <small class="text-muted">de {{ "%.1f"|format(user_item.total_mb / 1024) }} GB</small>
                             {% else %}
                                 <span class="text-muted">Sem créditos</span>
                             {% endif %}
                         </td>
                         <td>
                             <span class="badge bg-success">Ativo</span>
+                        </td>
+                        <td>
+                            {% if user_item.email %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-check-circle"></i> Habilitado
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-x-circle"></i> Sem acesso
+                                </span>
+                            {% endif %}
                         </td>
                         <td>
                             <button class="btn btn-sm btn-outline-info" title="Ver Detalhes">
@@ -57,6 +88,12 @@
                             <button class="btn btn-sm btn-outline-danger" title="Excluir">
                                 <i class="bi bi-trash"></i>
                             </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted">
+                            Nenhum usuário hotspot encontrado
                         </td>
                     </tr>
                     {% endfor %}
@@ -76,10 +113,15 @@
             </div>
             <form method="POST">
                 <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Importante:</strong> Se informar email e nome, será criado automaticamente um usuário do sistema para acesso ao dashboard de créditos.
+                    </div>
+                    
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="company_id" class="form-label">Empresa</label>
+                                <label for="company_id" class="form-label">Empresa *</label>
                                 <select class="form-select" id="company_id" name="company_id" required>
                                     <option value="">Selecione uma empresa</option>
                                     {% for company in companies_list %}
@@ -103,32 +145,32 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="username" class="form-label">Username</label>
+                                <label for="username" class="form-label">Username *</label>
                                 <input type="text" class="form-control" id="username" name="username" required>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="password" class="form-label">Senha</label>
+                                <label for="password" class="form-label">Senha *</label>
                                 <input type="password" class="form-control" id="password" name="password" required>
                             </div>
                         </div>
                     </div>
                     <div class="mb-3">
                         <label for="full_name" class="form-label">Nome Completo</label>
-                        <input type="text" class="form-control" id="full_name" name="full_name">
+                        <input type="text" class="form-control" id="full_name" name="full_name" placeholder="Para criar acesso ao sistema">
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="email" class="form-label">Email</label>
-                                <input type="email" class="form-control" id="email" name="email">
+                                <input type="email" class="form-control" id="email" name="email" placeholder="Para criar acesso ao sistema">
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="phone" class="form-label">Telefone</label>
-                                <input type="text" class="form-control" id="phone" name="phone">
+                                <input type="text" class="form-control" id="phone" name="phone" placeholder="(11) 99999-9999">
                             </div>
                         </div>
                     </div>
@@ -141,4 +183,18 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterByCompany(companyId) {
+    const url = new URL(window.location);
+    if (companyId) {
+        url.searchParams.set('company_id', companyId);
+    } else {
+        url.searchParams.delete('company_id');
+    }
+    window.location.href = url.toString();
+}
+</script>
 {% endblock %}

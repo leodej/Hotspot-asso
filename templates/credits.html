@@ -1,16 +1,26 @@
 {% extends "base.html" %}
 
-{% block page_title %}Créditos{% endblock %}
+{% block page_title %}Créditos - MikroTik Manager{% endblock %}
 
 {% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4><i class="bi bi-credit-card"></i> Gerenciamento de Créditos</h4>
+        <p class="text-muted">Acompanhe e gerencie créditos dos usuários</p>
+    </div>
+    <button class="btn btn-primary" onclick="updateCredits()">
+        <i class="bi bi-arrow-clockwise"></i> Atualizar Créditos
+    </button>
+</div>
+
 <!-- Stats Cards -->
 <div class="row mb-4">
     <div class="col-md-3 mb-3">
         <div class="card text-center">
             <div class="card-body">
-                <i class="bi bi-database text-primary" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ "%.1f"|format(stats.total_credits_mb / 1024) }} GB</h3>
-                <p class="text-muted mb-0">Total Créditos</p>
+                <i class="bi bi-credit-card text-primary" style="font-size: 2rem;"></i>
+                <h3 class="mt-2">{{ format_mb_to_gb(stats.total_credits_mb) }}</h3>
+                <p class="text-muted mb-0">Total de Créditos</p>
             </div>
         </div>
     </div>
@@ -18,7 +28,7 @@
         <div class="card text-center">
             <div class="card-body">
                 <i class="bi bi-arrow-down-circle text-danger" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ "%.1f"|format(stats.used_credits_mb / 1024) }} GB</h3>
+                <h3 class="mt-2">{{ format_mb_to_gb(stats.used_credits_mb) }}</h3>
                 <p class="text-muted mb-0">Créditos Usados</p>
             </div>
         </div>
@@ -27,7 +37,7 @@
         <div class="card text-center">
             <div class="card-body">
                 <i class="bi bi-arrow-up-circle text-success" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ "%.1f"|format(stats.remaining_credits_mb / 1024) }} GB</h3>
+                <h3 class="mt-2">{{ format_mb_to_gb(stats.remaining_credits_mb) }}</h3>
                 <p class="text-muted mb-0">Créditos Restantes</p>
             </div>
         </div>
@@ -43,26 +53,10 @@
     </div>
 </div>
 
-<!-- Actions -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Gerenciamento de Créditos</h5>
-                    <button class="btn btn-primary" onclick="updateCredits()">
-                        <i class="bi bi-arrow-clockwise"></i> Atualizar Créditos
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Credits List -->
+<!-- Credits Table -->
 <div class="card">
     <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-list-ul"></i> Créditos por Usuário</h5>
+        <h5 class="mb-0">Créditos por Usuário</h5>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -75,28 +69,27 @@
                         <th>Total</th>
                         <th>Usado</th>
                         <th>Restante</th>
-                        <th>Progresso</th>
                         <th>Último Reset</th>
+                        <th>Atualizado</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for credit in credits_list %}
                     <tr>
-                        <td>{{ credit.username }}</td>
+                        <td><strong>{{ credit.username }}</strong></td>
                         <td>{{ credit.full_name or '-' }}</td>
                         <td>{{ credit.company_name }}</td>
-                        <td>{{ "%.1f"|format(credit.total_mb / 1024) }} GB</td>
-                        <td>{{ "%.1f"|format(credit.used_mb / 1024) }} GB</td>
-                        <td>{{ "%.1f"|format(credit.remaining_mb / 1024) }} GB</td>
-                        <td>
-                            <div class="progress" style="width: 120px;">
-                                <div class="progress-bar" 
-                                     style="width: {{ (credit.used_mb / credit.total_mb * 100) if credit.total_mb else 0 }}%"
-                                     title="{{ "%.1f"|format((credit.used_mb / credit.total_mb * 100) if credit.total_mb else 0) }}% usado">
-                                </div>
-                            </div>
-                        </td>
+                        <td>{{ format_mb_to_gb(credit.total_mb) }}</td>
+                        <td class="text-danger">{{ format_mb_to_gb(credit.used_mb) }}</td>
+                        <td class="text-success">{{ format_mb_to_gb(credit.remaining_mb) }}</td>
                         <td>{{ credit.last_reset or '-' }}</td>
+                        <td>{{ credit.updated_at }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted">
+                            Nenhum crédito encontrado
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -109,26 +102,24 @@
 {% block scripts %}
 <script>
 function updateCredits() {
-    if (confirm('Deseja atualizar os créditos de todos os usuários?')) {
-        fetch('/api/update-credits', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert('Créditos atualizados com sucesso!');
-                location.reload();
-            } else {
-                alert('Erro ao atualizar créditos: ' + data.message);
-            }
-        })
-        .catch(error => {
-            alert('Erro na requisição: ' + error);
-        });
-    }
+    fetch('/api/update-credits', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('Créditos atualizados com sucesso!');
+            location.reload();
+        } else {
+            alert('Erro ao atualizar créditos: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Erro na requisição: ' + error);
+    });
 }
 </script>
 {% endblock %}

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block page_title %}Meus Créditos - MikroTik Manager{% endblock %}
+
+{% block content %}
+<div class="text-center mb-4">
+    <h2><i class="bi bi-person-circle"></i> Olá, {{ user.name }}!</h2>
+    <p class="text-muted">Acompanhe seus créditos de internet</p>
+</div>
+
+<!-- Cartão Principal de Créditos -->
+<div class="row justify-content-center mb-4">
+    <div class="col-md-8">
+        <div class="card border-0 shadow-lg">
+            <div class="card-body p-4">
+                <div class="row align-items-center">
+                    <div class="col-md-4 text-center">
+                        <div class="position-relative d-inline-block">
+                            <svg width="120" height="120" class="position-relative">
+                                <circle cx="60" cy="60" r="50" fill="none" stroke="#e9ecef" stroke-width="8"/>
+                                <circle cx="60" cy="60" r="50" fill="none" stroke="#28a745" stroke-width="8"
+                                        stroke-dasharray="{{ (hotspot_user.remaining_mb / hotspot_user.total_mb * 314) if hotspot_user.total_mb else 0 }} 314"
+                                        stroke-linecap="round" transform="rotate(-90 60 60)"/>
+                            </svg>
+                            <div class="position-absolute top-50 start-50 translate-middle text-center">
+                                <h4 class="mb-0 text-success">{{ "%.1f"|format((hotspot_user.remaining_mb or 0) / 1024) }}</h4>
+                                <small class="text-muted">GB restantes</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-8">
+                        <h4 class="mb-3">Seus Créditos</h4>
+                        
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <div class="text-center p-3 bg-light rounded">
+                                    <h5 class="text-primary mb-1">{{ format_mb_to_gb(hotspot_user.total_mb or 0) }}</h5>
+                                    <small class="text-muted">Total</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center p-3 bg-light rounded">
+                                    <h5 class="text-danger mb-1">{{ format_mb_to_gb(hotspot_user.used_mb or 0) }}</h5>
+                                    <small class="text-muted">Usado</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="progress mb-2" style="height: 10px;">
+                            <div class="progress-bar bg-success" style="width: {{ ((hotspot_user.remaining_mb or 0) / (hotspot_user.total_mb or 1) * 100) }}%"></div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">
+                                {{ "%.1f"|format(((hotspot_user.remaining_mb or 0) / (hotspot_user.total_mb or 1) * 100)) }}% disponível
+                            </small>
+                            <small class="text-muted">
+                                Último reset: {{ hotspot_user.last_reset or 'Nunca' }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Informações da Conta -->
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-person-badge"></i> Informações da Conta</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Username:</strong></div>
+                    <div class="col-8">{{ hotspot_user.username }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Nome:</strong></div>
+                    <div class="col-8">{{ hotspot_user.full_name or '-' }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Email:</strong></div>
+                    <div class="col-8">{{ hotspot_user.email or '-' }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-4"><strong>Empresa:</strong></div>
+                    <div class="col-8">{{ hotspot_user.company_name }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-4"><strong>Perfil:</strong></div>
+                    <div class="col-8">{{ hotspot_user.profile_name or 'Padrão' }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Histórico de Uso</h5>
+            </div>
+            <div class="card-body">
+                {% for day in usage_history[-5:] %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>{{ day.date }}</span>
+                    <div class="d-flex align-items-center">
+                        <div class="progress me-2" style="width: 100px; height: 6px;">
+                            <div class="progress-bar" style="width: {{ (day.used_mb / 100) }}%"></div>
+                        </div>
+                        <small class="text-muted">{{ day.used_mb }} MB</small>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Botões de Ação -->
+<div class="text-center">
+    <button class="btn btn-outline-primary me-2" onclick="location.reload()">
+        <i class="bi bi-arrow-clockwise"></i> Atualizar
+    </button>
+    <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-danger">
+        <i class="bi bi-box-arrow-right"></i> Sair
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-refresh a cada 30 segundos
+setInterval(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

@@ -1,13 +1,13 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 import sqlite3
 import uuid
-from utils.auth import require_auth
+from utils.auth import require_admin
 from database import get_db
 
 users_bp = Blueprint('users', __name__)
 
 @users_bp.route('/users', methods=['GET', 'POST'])
-@require_auth
+@require_admin
 def users():
     """Página de usuários do sistema"""
     if request.method == 'POST':
@@ -22,9 +22,9 @@ def users():
             conn = get_db()
             try:
                 conn.execute('''
-                    INSERT INTO system_users (id, email, password, name, role)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (str(uuid.uuid4()), email, password, name, role))
+                    INSERT INTO system_users (id, email, password, name, role, user_type)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (str(uuid.uuid4()), email, password, name, role, 'admin'))
                 conn.commit()
                 flash('Usuário cadastrado com sucesso!', 'success')
             except sqlite3.IntegrityError:
@@ -34,11 +34,11 @@ def users():
         
         return redirect(url_for('users.users'))
     
-    # Buscar usuários
+    # Buscar usuários (apenas admins)
     conn = get_db()
     users_list = conn.execute('''
         SELECT * FROM system_users 
-        WHERE active = 1 
+        WHERE active = 1 AND user_type = 'admin'
         ORDER BY created_at DESC
     ''').fetchall()
     conn.close()

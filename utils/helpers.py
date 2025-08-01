@@ -7,17 +7,6 @@ def get_setting(key, default=None):
     conn.close()
     return setting['value'] if setting else default
 
-def format_bytes(bytes_value):
-    """Converte bytes para formato legível"""
-    if bytes_value >= 1024 * 1024 * 1024:  # GB
-        return f"{bytes_value / (1024 * 1024 * 1024):.2f} GB"
-    elif bytes_value >= 1024 * 1024:  # MB
-        return f"{bytes_value / (1024 * 1024):.2f} MB"
-    elif bytes_value >= 1024:  # KB
-        return f"{bytes_value / 1024:.2f} KB"
-    else:
-        return f"{bytes_value} B"
-
 def update_credits_cumulative():
     """Atualiza créditos cumulativos diariamente"""
     conn = get_db()
@@ -52,3 +41,12 @@ def update_credits_cumulative():
     
     conn.commit()
     conn.close()
+
+def format_mb_to_gb(mb_value):
+    """Converte MB para GB formatado"""
+    if not mb_value:
+        return "0 GB"
+    gb_value = mb_value / 1024
+    if gb_value < 1:
+        return f"{mb_value} MB"
+    return f"{gb_value:.1f} GB"

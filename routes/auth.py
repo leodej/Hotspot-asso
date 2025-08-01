@@ -28,10 +28,17 @@ def login():
             session['email'] = user['email']
             session['name'] = user['name']
             session['role'] = user['role']
+            session['user_type'] = user['user_type']
+            session['hotspot_user_id'] = user['hotspot_user_id']
             session['login_time'] = datetime.now().isoformat()
             
             flash(f'Bem-vindo, {user["name"]}!', 'success')
-            return redirect(url_for('main.dashboard'))
+            
+            # Redirecionar baseado no tipo de usuário
+            if user['user_type'] == 'hotspot':
+                return redirect(url_for('main.user_dashboard'))
+            else:
+                return redirect(url_for('main.dashboard'))
         else:
             flash('Email ou senha incorretos', 'error')
     

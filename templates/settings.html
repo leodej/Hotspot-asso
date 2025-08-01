@@ -1,191 +1,104 @@
 {% extends "base.html" %}
 
-{% block page_title %}Configurações{% endblock %}
+{% block page_title %}Configurações - MikroTik Manager{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-gear"></i> Configurações do Sistema</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST">
-                    <div class="mb-4">
-                        <h6 class="text-primary">Configurações de Créditos</h6>
-                        <hr>
-                        
-                        <div class="mb-3">
-                            <label for="default_credit_mb" class="form-label">Crédito Padrão (MB)</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" id="default_credit_mb" name="default_credit_mb" 
-                                       value="{{ settings.default_credit_mb or '1024' }}" required>
-                                <span class="input-group-text">MB</span>
-                            </div>
-                            <div class="form-text">
-                                Crédito padrão para novos usuários ({{ "%.1f"|format((settings.default_credit_mb|int or 1024) / 1024) }} GB)
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="credit_reset_time" class="form-label">Horário de Reset</label>
-                            <input type="time" class="form-control" id="credit_reset_time" name="credit_reset_time" 
-                                   value="{{ settings.credit_reset_time or '00:00' }}">
-                            <div class="form-text">Horário diário para reset/adição de créditos</div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="enable_cumulative" name="enable_cumulative" 
-                                       {{ 'checked' if settings.enable_cumulative == '1' else '' }}>
-                                <label class="form-check-label" for="enable_cumulative">
-                                    Habilitar Créditos Cumulativos
-                                </label>
-                            </div>
-                            <div class="form-text">
-                                Se habilitado, créditos não utilizados serão somados ao próximo período
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <h6 class="text-primary">Configurações Gerais</h6>
-                        <hr>
-                        
-                        <div class="mb-3">
-                            <label for="system_timezone" class="form-label">Timezone do Sistema</label>
-                            <select class="form-select" id="system_timezone" name="system_timezone">
-                                <option value="America/Sao_Paulo" {{ 'selected' if settings.system_timezone == 'America/Sao_Paulo' else '' }}>
-                                    America/São Paulo (UTC-3)
-                                </option>
-                                <option value="America/New_York" {{ 'selected' if settings.system_timezone == 'America/New_York' else '' }}>
-                                    America/New York (UTC-5)
-                                </option>
-                                <option value="Europe/London" {{ 'selected' if settings.system_timezone == 'Europe/London' else '' }}>
-                                    Europe/London (UTC+0)
-                                </option>
-                                <option value="UTC" {{ 'selected' if settings.system_timezone == 'UTC' else '' }}>
-                                    UTC
-                                </option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex justify-content-end">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle"></i> Salvar Configurações
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4><i class="bi bi-gear"></i> Configurações do Sistema</h4>
+        <p class="text-muted">Configure parâmetros do sistema</p>
     </div>
-    
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Informações</h5>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <small class="text-muted">Versão do Sistema</small>
-                    <div><strong>v1.0.0</strong></div>
-                </div>
-                
-                <div class="mb-3">
-                    <small class="text-muted">Banco de Dados</small>
-                    <div>SQLite</div>
-                </div>
-                
-                <div class="mb-3">
-                    <small class="text-muted">Status</small>
-                    <div>
-                        <span class="badge bg-success">Online</span>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Configurações de Créditos</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="default_credit_mb" class="form-label">Crédito Padrão (MB)</label>
+                        <input type="number" class="form-control" id="default_credit_mb" name="default_credit_mb" 
+                               value="{{ settings.get('default_credit_mb', 1024) }}">
+                        <div class="form-text">Crédito inicial para novos usuários (1024 MB = 1 GB)</div>
                     </div>
                 </div>
-                
-                <hr>
-                
-                <div class="d-grid gap-2">
-                    <button class="btn btn-outline-primary btn-sm" onclick="testConnection()">
-                        <i class="bi bi-wifi"></i> Testar Conexões
-                    </button>
-                    <button class="btn btn-outline-warning btn-sm" onclick="backupSystem()">
-                        <i class="bi bi-download"></i> Backup Sistema
-                    </button>
-                    <button class="btn btn-outline-info btn-sm" onclick="viewLogs()">
-                        <i class="bi bi-file-text"></i> Ver Logs
-                    </button>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="credit_reset_time" class="form-label">Horário de Reset</label>
+                        <input type="time" class="form-control" id="credit_reset_time" name="credit_reset_time" 
+                               value="{{ settings.get('credit_reset_time', '00:00') }}">
+                        <div class="form-text">Horário diário para reset dos créditos</div>
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="card mt-3">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Ações Rápidas</h5>
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <button class="btn btn-outline-success btn-sm" onclick="updateAllCredits()">
-                        <i class="bi bi-arrow-clockwise"></i> Atualizar Todos os Créditos
-                    </button>
-                    <button class="btn btn-outline-primary btn-sm" onclick="syncMikrotiks()">
-                        <i class="bi bi-arrow-repeat"></i> Sincronizar MikroTiks
-                    </button>
-                    <button class="btn btn-outline-info btn-sm" onclick="generateReport()">
-                        <i class="bi bi-file-earmark-text"></i> Gerar Relatório
-                    </button>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="enable_cumulative" name="enable_cumulative" 
+                                   {{ 'checked' if settings.get('enable_cumulative', '1') == '1' }}>
+                            <label class="form-check-label" for="enable_cumulative">
+                                Habilitar Créditos Cumulativos
+                            </label>
+                        </div>
+                        <div class="form-text">Se habilitado, créditos não utilizados são acumulados</div>
+                    </div>
                 </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="system_timezone" class="form-label">Timezone do Sistema</label>
+                        <select class="form-select" id="system_timezone" name="system_timezone">
+                            <option value="America/Sao_Paulo" {{ 'selected' if settings.get('system_timezone') == 'America/Sao_Paulo' }}>
+                                America/Sao_Paulo
+                            </option>
+                            <option value="America/New_York" {{ 'selected' if settings.get('system_timezone') == 'America/New_York' }}>
+                                America/New_York
+                            </option>
+                            <option value="Europe/London" {{ 'selected' if settings.get('system_timezone') == 'Europe/London' }}>
+                                Europe/London
+                            </option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Salvar Configurações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Sistema Info -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">Informações do Sistema</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Status do Sistema</h6>
+                <p><span class="badge bg-success">Online</span> Sistema funcionando normalmente</p>
+                
+                <h6>Banco de Dados</h6>
+                <p><i class="bi bi-database"></i> SQLite - mikrotik_manager.db</p>
+            </div>
+            <div class="col-md-6">
+                <h6>Configurações Atuais</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Crédito Padrão:</strong> {{ settings.get('default_credit_mb', 1024) }} MB</li>
+                    <li><strong>Sistema Cumulativo:</strong> {{ 'Habilitado' if settings.get('enable_cumulative', '1') == '1' else 'Desabilitado' }}</li>
+                    <li><strong>Reset Diário:</strong> {{ settings.get('credit_reset_time', '00:00') }}</li>
+                    <li><strong>Timezone:</strong> {{ settings.get('system_timezone', 'America/Sao_Paulo') }}</li>
+                </ul>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-function testConnection() {
-    alert('Testando conexões com MikroTiks...');
-}
-
-function backupSystem() {
-    if (confirm('Deseja fazer backup do sistema?')) {
-        alert('Backup iniciado...');
-    }
-}
-
-function viewLogs() {
-    alert('Visualizando logs do sistema...');
-}
-
-function updateAllCredits() {
-    if (confirm('Deseja atualizar os créditos de todos os usuários?')) {
-        fetch('/api/update-credits', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert('Créditos atualizados com sucesso!');
-            } else {
-                alert('Erro ao atualizar créditos: ' + data.message);
-            }
-        })
-        .catch(error => {
-            alert('Erro na requisição: ' + error);
-        });
-    }
-}
-
-function syncMikrotiks() {
-    alert('Sincronizando com MikroTiks...');
-}
-
-function generateReport() {
-    alert('Gerando relatório...');
-}
-</script>
 {% endblock %}

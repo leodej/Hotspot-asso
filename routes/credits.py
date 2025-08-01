@@ -1,11 +1,12 @@
 from flask import Blueprint, render_template, session
-from utils.auth import require_auth
+from utils.auth import require_admin
+from utils.helpers import format_mb_to_gb
 from database import get_db
 
 credits_bp = Blueprint('credits', __name__)
 
 @credits_bp.route('/credits')
-@require_auth
+@require_admin
 def credits():
     """Página de créditos"""
     conn = get_db()
@@ -34,4 +35,5 @@ def credits():
     return render_template('credits.html', 
                          user={'name': session.get('name')}, 
                          stats=stats,
-                         credits_list=credits_list)
+                         credits_list=credits_list,
+                         format_mb_to_gb=format_mb_to_gb)

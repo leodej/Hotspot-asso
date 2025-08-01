@@ -1,12 +1,13 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+import sqlite3
 import uuid
-from utils.auth import require_auth
+from utils.auth import require_admin
 from database import get_db
 
 profiles_bp = Blueprint('profiles', __name__)
 
 @profiles_bp.route('/profiles', methods=['GET', 'POST'])
-@require_auth
+@require_admin
 def profiles():
     """Página de perfis hotspot"""
     if request.method == 'POST':

@@ -1,10 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-import os
-import json
-from datetime import datetime, timedelta
-import hashlib
-import sqlite3
-import uuid
+from flask import Flask
 from config import Config
 from database import init_db
 
@@ -45,9 +39,10 @@ if __name__ == '__main__':
     app = create_app()
     
     print("🚀 Iniciando MikroTik Manager Flask...")
-    print("📧 Login: admin@demo.com")
-    print("🔑 Senha: admin123")
+    print("📧 Login Admin: admin@demo.com")
+    print("🔑 Senha Admin: admin123")
     print("🌐 URL: http://localhost:5000")
     print("💾 Banco: mikrotik_manager.db")
+    print("👤 Usuários hotspot podem fazer login com email/senha")
     
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -1,11 +1,11 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from utils.auth import require_auth
+from utils.auth import require_admin
 from database import get_db
 
 settings_bp = Blueprint('settings', __name__)
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
-@require_auth
+@require_admin
 def settings():
     """Página de configurações"""
     if request.method == 'POST':

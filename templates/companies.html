@@ -1,10 +1,13 @@
 {% extends "base.html" %}
 
-{% block page_title %}Empresas{% endblock %}
+{% block page_title %}Empresas - MikroTik Manager{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4><i class="bi bi-building"></i> Empresas</h4>
+    <div>
+        <h4><i class="bi bi-building"></i> Empresas</h4>
+        <p class="text-muted">Gerencie empresas e conexões MikroTik</p>
+    </div>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCompanyModal">
         <i class="bi bi-plus-circle"></i> Nova Empresa
     </button>
@@ -27,14 +30,14 @@
                 <tbody>
                     {% for company in companies_list %}
                     <tr>
-                        <td>{{ company.name }}</td>
+                        <td><strong>{{ company.name }}</strong></td>
                         <td>{{ company.mikrotik_ip }}</td>
                         <td>{{ company.mikrotik_port }}</td>
                         <td>
                             <span class="badge bg-info">{{ company.user_count }} usuários</span>
                         </td>
                         <td>
-                            <span class="badge bg-success">Ativo</span>
+                            <span class="badge bg-success">Ativa</span>
                         </td>
                         <td>
                             <button class="btn btn-sm btn-outline-success" title="Testar Conexão">
@@ -46,6 +49,12 @@
                             <button class="btn btn-sm btn-outline-danger" title="Excluir">
                                 <i class="bi bi-trash"></i>
                             </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">
+                            Nenhuma empresa cadastrada
                         </td>
                     </tr>
                     {% endfor %}
@@ -69,21 +78,33 @@
                         <label for="name" class="form-label">Nome da Empresa</label>
                         <input type="text" class="form-control" id="name" name="name" required>
                     </div>
-                    <div class="mb-3">
-                        <label for="mikrotik_ip" class="form-label">IP do MikroTik</label>
-                        <input type="text" class="form-control" id="mikrotik_ip" name="mikrotik_ip" placeholder="192.168.1.1" required>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="mikrotik_ip" class="form-label">IP do MikroTik</label>
+                                <input type="text" class="form-control" id="mikrotik_ip" name="mikrotik_ip" placeholder="192.168.1.1" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="mikrotik_port" class="form-label">Porta</label>
+                                <input type="number" class="form-control" id="mikrotik_port" name="mikrotik_port" value="8728">
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="mikrotik_port" class="form-label">Porta API</label>
-                        <input type="number" class="form-control" id="mikrotik_port" name="mikrotik_port" value="8728" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="mikrotik_user" class="form-label">Usuário MikroTik</label>
-                        <input type="text" class="form-control" id="mikrotik_user" name="mikrotik_user" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="mikrotik_password" class="form-label">Senha MikroTik</label>
-                        <input type="password" class="form-control" id="mikrotik_password" name="mikrotik_password" required>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="mikrotik_user" class="form-label">Usuário MikroTik</label>
+                                <input type="text" class="form-control" id="mikrotik_user" name="mikrotik_user" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="mikrotik_password" class="form-label">Senha MikroTik</label>
+                                <input type="password" class="form-control" id="mikrotik_password" name="mikrotik_password" required>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

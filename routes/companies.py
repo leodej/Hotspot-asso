@@ -1,12 +1,13 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+import sqlite3
 import uuid
-from utils.auth import require_auth
+from utils.auth import require_admin
 from database import get_db
 
 companies_bp = Blueprint('companies', __name__)
 
 @companies_bp.route('/companies', methods=['GET', 'POST'])
-@require_auth
+@require_admin
 def companies():
     """Página de empresas"""
     if request.method == 'POST':

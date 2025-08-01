@@ -1,10 +1,13 @@
 {% extends "base.html" %}
 
-{% block page_title %}Perfis Hotspot{% endblock %}
+{% block page_title %}Perfis Hotspot - MikroTik Manager{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4><i class="bi bi-person-badge"></i> Perfis Hotspot</h4>
+    <div>
+        <h4><i class="bi bi-person-badge"></i> Perfis Hotspot</h4>
+        <p class="text-muted">Gerencie perfis de acesso hotspot</p>
+    </div>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProfileModal">
         <i class="bi bi-plus-circle"></i> Novo Perfil
     </button>
@@ -21,24 +24,34 @@
                         <th>Download</th>
                         <th>Upload</th>
                         <th>Tempo Limite</th>
+                        <th>Status</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for profile in profiles_list %}
                     <tr>
-                        <td>{{ profile.name }}</td>
+                        <td><strong>{{ profile.name }}</strong></td>
                         <td>{{ profile.company_name }}</td>
                         <td>{{ profile.download_limit }} Mbps</td>
                         <td>{{ profile.upload_limit }} Mbps</td>
-                        <td>{{ profile.time_limit if profile.time_limit else 'Ilimitado' }}</td>
+                        <td>{{ profile.time_limit or 'Ilimitado' }}</td>
                         <td>
-                            <button class="btn btn-sm btn-outline-primary">
+                            <span class="badge bg-success">Ativo</span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" title="Editar">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-danger">
+                            <button class="btn btn-sm btn-outline-danger" title="Excluir">
                                 <i class="bi bi-trash"></i>
                             </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">
+                            Nenhum perfil cadastrado
                         </td>
                     </tr>
                     {% endfor %}
@@ -53,7 +66,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Novo Perfil</h5>
+                <h5 class="modal-title">Novo Perfil Hotspot</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST">
@@ -71,16 +84,22 @@
                         <label for="name" class="form-label">Nome do Perfil</label>
                         <input type="text" class="form-control" id="name" name="name" required>
                     </div>
-                    <div class="mb-3">
-                        <label for="download_limit" class="form-label">Limite Download (Mbps)</label>
-                        <input type="number" class="form-control" id="download_limit" name="download_limit" required>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="download_limit" class="form-label">Limite Download (Mbps)</label>
+                                <input type="number" class="form-control" id="download_limit" name="download_limit" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="upload_limit" class="form-label">Limite Upload (Mbps)</label>
+                                <input type="number" class="form-control" id="upload_limit" name="upload_limit" required>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
-                        <label for="upload_limit" class="form-label">Limite Upload (Mbps)</label>
-                        <input type="number" class="form-control" id="upload_limit" name="upload_limit" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="time_limit" class="form-label">Tempo Limite (minutos)</label>
+                        <label for="time_limit" class="form-label">Limite de Tempo (minutos)</label>
                         <input type="number" class="form-control" id="time_limit" name="time_limit" placeholder="Deixe vazio para ilimitado">
                     </div>
                 </div>

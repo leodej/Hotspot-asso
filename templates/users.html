@@ -1,10 +1,13 @@
 {% extends "base.html" %}
 
-{% block page_title %}Usuários do Sistema{% endblock %}
+{% block page_title %}Usuários do Sistema - MikroTik Manager{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4><i class="bi bi-people"></i> Usuários do Sistema</h4>
+    <div>
+        <h4><i class="bi bi-people"></i> Usuários do Sistema</h4>
+        <p class="text-muted">Gerencie usuários administradores</p>
+    </div>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
         <i class="bi bi-plus-circle"></i> Novo Usuário
     </button>
@@ -19,6 +22,7 @@
                         <th>Nome</th>
                         <th>Email</th>
                         <th>Função</th>
+                        <th>Tipo</th>
                         <th>Criado em</th>
                         <th>Ações</th>
                     </tr>
@@ -33,14 +37,23 @@
                                 {{ user_item.role.title() }}
                             </span>
                         </td>
+                        <td>
+                            <span class="badge bg-info">Administrador</span>
+                        </td>
                         <td>{{ user_item.created_at }}</td>
                         <td>
-                            <button class="btn btn-sm btn-outline-primary">
+                            <button class="btn btn-sm btn-outline-primary" title="Editar">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-danger">
+                            <button class="btn btn-sm btn-outline-danger" title="Excluir">
                                 <i class="bi bi-trash"></i>
                             </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">
+                            Nenhum usuário administrador encontrado
                         </td>
                     </tr>
                     {% endfor %}
@@ -55,7 +68,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Novo Usuário</h5>
+                <h5 class="modal-title">Novo Usuário Administrador</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST">
