@@ -1,200 +1,176 @@
 {% extends "base.html" %}
 
-{% block page_title %}Usuários Hotspot - MikroTik Manager{% endblock %}
+{% block title %}Usuários Hotspot - MikroTik Manager{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h4><i class="bi bi-wifi"></i> Usuários Hotspot</h4>
-        <p class="text-muted">Gerencie usuários de acesso hotspot</p>
-    </div>
-    
-    <div class="d-flex gap-2">
-        <!-- Filtro por Empresa -->
-        <select class="form-select" onchange="filterByCompany(this.value)" style="width: 200px;">
-            <option value="">Todas as Empresas</option>
-            {% for company in companies_list %}
-            <option value="{{ company.id }}" {{ 'selected' if company.id == selected_company }}>
-                {{ company.name }}
-            </option>
-            {% endfor %}
-        </select>
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Usuários Hotspot</h1>
         
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
-            <i class="bi bi-plus-circle"></i> Novo Usuário
-        </button>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th>Nome Completo</th>
-                        <th>Empresa</th>
-                        <th>Perfil</th>
-                        <th>Créditos</th>
-                        <th>Status</th>
-                        <th>Login Sistema</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for user_item in hotspot_users_list %}
-                    <tr>
-                        <td><strong>{{ user_item.username }}</strong></td>
-                        <td>{{ user_item.full_name or '-' }}</td>
-                        <td>
-                            <span class="badge bg-primary">{{ user_item.company_name }}</span>
-                        </td>
-                        <td>{{ user_item.profile_name or '-' }}</td>
-                        <td>
-                            {% if user_item.remaining_mb %}
-                                <div class="d-flex align-items-center">
-                                    <div class="progress me-2" style="width: 80px; height: 6px;">
-                                        <div class="progress-bar bg-success" style="width: {{ (user_item.remaining_mb / user_item.total_mb * 100) if user_item.total_mb else 0 }}%"></div>
-                                    </div>
-                                    <small class="text-success">{{ "%.1f"|format(user_item.remaining_mb / 1024) }} GB</small>
-                                </div>
-                                <small class="text-muted">de {{ "%.1f"|format(user_item.total_mb / 1024) }} GB</small>
-                            {% else %}
-                                <span class="text-muted">Sem créditos</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="badge bg-success">Ativo</span>
-                        </td>
-                        <td>
-                            {% if user_item.email %}
-                                <span class="badge bg-info">
-                                    <i class="bi bi-check-circle"></i> Habilitado
-                                </span>
-                            {% else %}
-                                <span class="badge bg-secondary">
-                                    <i class="bi bi-x-circle"></i> Sem acesso
-                                </span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-info" title="Ver Detalhes">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-primary" title="Editar">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" title="Excluir">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="8" class="text-center text-muted">
-                            Nenhum usuário hotspot encontrado
-                        </td>
-                    </tr>
+        <!-- Filtro por Empresa -->
+        <div class="d-sm-flex align-items-center">
+            <form method="GET" class="d-flex align-items-center mr-3">
+                <label for="company" class="mr-2 mb-0">Filtrar:</label>
+                <select name="company" id="company" class="form-control form-control-sm mr-2" onchange="this.form.submit()">
+                    <option value="">Todas as Empresas</option>
+                    {% for company in companies %}
+                    <option value="{{ company[0] }}" {% if selected_company == company[0]|string %}selected{% endif %}>
+                        {{ company[1] }}
+                    </option>
                     {% endfor %}
-                </tbody>
-            </table>
+                </select>
+                {% if selected_company %}
+                <a href="{{ url_for('hotspot_users.hotspot_users') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-times"></i>
+                </a>
+                {% endif %}
+            </form>
+            
+            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addUserModal">
+                <i class="fas fa-plus"></i> Novo Usuário
+            </button>
+        </div>
+    </div>
+
+    <!-- DataTales Example -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Lista de Usuários Hotspot</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Empresa</th>
+                            <th>Perfil</th>
+                            <th>Créditos</th>
+                            <th>Status</th>
+                            <th>Criado em</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user[1] }}</td>
+                            <td>{{ user[2] or 'N/A' }}</td>
+                            <td>{{ user[5] }}</td>
+                            <td>{{ user[6] or 'Padrão' }}</td>
+                            <td>
+                                {% if user[7] %}
+                                    {% set total_mb = user[7] %}
+                                    {% set used_mb = user[8] or 0 %}
+                                    {% set remaining_mb = total_mb - used_mb %}
+                                    
+                                    <div class="progress mb-1" style="height: 20px;">
+                                        {% set usage_percent = (used_mb / total_mb * 100) if total_mb > 0 else 0 %}
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: {{ usage_percent }}%" 
+                                             aria-valuenow="{{ usage_percent }}" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                            {{ "%.1f"|format(usage_percent) }}%
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">
+                                        {% if remaining_mb >= 1024 %}
+                                            {{ "%.2f"|format(remaining_mb / 1024) }} GB restantes
+                                        {% else %}
+                                            {{ remaining_mb }} MB restantes
+                                        {% endif %}
+                                    </small>
+                                {% else %}
+                                    <span class="text-muted">Sem créditos</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user[4] == 'active' %}
+                                    <span class="badge badge-success">Ativo</span>
+                                {% else %}
+                                    <span class="badge badge-danger">Inativo</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ user[3][:10] if user[3] else 'N/A' }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('hotspot_users.toggle_status', user_id=user[0]) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-warning" title="Alternar Status">
+                                        <i class="fas fa-toggle-on"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('hotspot_users.delete_hotspot_user', user_id=user[0]) }}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja deletar este usuário?')">
+                                    <button type="submit" class="btn btn-sm btn-danger" title="Deletar">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Modal Novo Usuário -->
-<div class="modal fade" id="addUserModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+<!-- Modal Adicionar Usuário -->
+<div class="modal fade" id="addUserModal" tabindex="-1" role="dialog" aria-labelledby="addUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Novo Usuário Hotspot</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="addUserModalLabel">Novo Usuário Hotspot</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
-            <form method="POST">
+            <form method="POST" action="{{ url_for('hotspot_users.add_hotspot_user') }}">
                 <div class="modal-body">
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i>
-                        <strong>Importante:</strong> Se informar email e nome, será criado automaticamente um usuário do sistema para acesso ao dashboard de créditos.
+                    <div class="form-group">
+                        <label for="username">Username *</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
                     </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="company_id" class="form-label">Empresa *</label>
-                                <select class="form-select" id="company_id" name="company_id" required>
-                                    <option value="">Selecione uma empresa</option>
-                                    {% for company in companies_list %}
-                                    <option value="{{ company.id }}">{{ company.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="profile_id" class="form-label">Perfil</label>
-                                <select class="form-select" id="profile_id" name="profile_id">
-                                    <option value="">Selecione um perfil</option>
-                                    {% for profile in profiles_list %}
-                                    <option value="{{ profile.id }}">{{ profile.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
+                    <div class="form-group">
+                        <label for="password">Senha *</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="username" class="form-label">Username *</label>
-                                <input type="text" class="form-control" id="username" name="username" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="password" class="form-label">Senha *</label>
-                                <input type="password" class="form-control" id="password" name="password" required>
-                            </div>
-                        </div>
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" class="form-control" id="email" name="email">
+                        <small class="form-text text-muted">Se informado, criará usuário do sistema automaticamente</small>
                     </div>
-                    <div class="mb-3">
-                        <label for="full_name" class="form-label">Nome Completo</label>
-                        <input type="text" class="form-control" id="full_name" name="full_name" placeholder="Para criar acesso ao sistema">
+                    <div class="form-group">
+                        <label for="name">Nome Completo</label>
+                        <input type="text" class="form-control" id="name" name="name">
+                        <small class="form-text text-muted">Necessário se informar email</small>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="email" class="form-label">Email</label>
-                                <input type="email" class="form-control" id="email" name="email" placeholder="Para criar acesso ao sistema">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="phone" class="form-label">Telefone</label>
-                                <input type="text" class="form-control" id="phone" name="phone" placeholder="(11) 99999-9999">
-                            </div>
-                        </div>
+                    <div class="form-group">
+                        <label for="company_id">Empresa *</label>
+                        <select class="form-control" id="company_id" name="company_id" required>
+                            <option value="">Selecione uma empresa</option>
+                            {% for company in companies %}
+                            <option value="{{ company[0] }}">{{ company[1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="profile_id">Perfil</label>
+                        <select class="form-control" id="profile_id" name="profile_id">
+                            <option value="">Perfil Padrão</option>
+                            {% for profile in profiles %}
+                            <option value="{{ profile[0] }}">{{ profile[1] }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Criar Usuário</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-function filterByCompany(companyId) {
-    const url = new URL(window.location);
-    if (companyId) {
-        url.searchParams.set('company_id', companyId);
-    } else {
-        url.searchParams.delete('company_id');
-    }
-    window.location.href = url.toString();
-}
-</script>
 {% endblock %}

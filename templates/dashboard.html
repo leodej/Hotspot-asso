@@ -1,171 +1,202 @@
 {% extends "base.html" %}
 
-{% block page_title %}Dashboard - MikroTik Manager{% endblock %}
+{% block title %}Dashboard - MikroTik Manager{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
-        <p class="text-muted">Visão geral do sistema</p>
-    </div>
-    
-    <!-- Filtro por Empresa -->
-    <div class="d-flex gap-2">
-        <select class="form-select" onchange="filterByCompany(this.value)" style="width: 200px;">
-            <option value="">Todas as Empresas</option>
-            {% for company in companies %}
-            <option value="{{ company.id }}" {{ 'selected' if company.id == selected_company }}>
-                {{ company.name }}
-            </option>
-            {% endfor %}
-        </select>
-        <button class="btn btn-outline-primary" onclick="updateCredits()">
-            <i class="bi bi-arrow-clockwise"></i> Atualizar
-        </button>
-    </div>
-</div>
-
-<!-- Stats Cards -->
-<div class="row mb-4">
-    <div class="col-md-3 mb-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-people text-primary" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ stats.total_users }}</h3>
-                <p class="text-muted mb-0">Usuários Hotspot</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-building text-success" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ stats.active_companies }}</h3>
-                <p class="text-muted mb-0">Empresas Ativas</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-person-badge text-warning" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ stats.total_profiles }}</h3>
-                <p class="text-muted mb-0">Perfis Hotspot</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-credit-card text-info" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ format_mb_to_gb(stats.total_credits_mb) }}</h3>
-                <p class="text-muted mb-0">Créditos Disponíveis</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Recent Activities -->
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-activity"></i> Atividades Recentes</h5>
-            </div>
-            <div class="card-body">
-                {% if activities %}
-                    {% for activity in activities %}
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="me-3">
-                            <i class="bi bi-person-plus text-success"></i>
-                        </div>
-                        <div>
-                            <h6 class="mb-1">{{ activity.title }}</h6>
-                            <small class="text-muted">{{ activity.description }}</small>
-                            {% if activity.company_name %}
-                            <span class="badge bg-light text-dark ms-2">{{ activity.company_name }}</span>
-                            {% endif %}
-                        </div>
-                    </div>
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Dashboard</h1>
+        
+        <!-- Filtro por Empresa -->
+        <div class="d-sm-flex align-items-center">
+            <form method="GET" class="d-flex align-items-center">
+                <label for="company" class="mr-2 mb-0">Filtrar por Empresa:</label>
+                <select name="company" id="company" class="form-control form-control-sm mr-2" onchange="this.form.submit()">
+                    <option value="">Todas as Empresas</option>
+                    {% for company in companies %}
+                    <option value="{{ company[0] }}" {% if selected_company == company[0]|string %}selected{% endif %}>
+                        {{ company[1] }}
+                    </option>
                     {% endfor %}
-                {% else %}
-                    <p class="text-muted">Nenhuma atividade recente</p>
+                </select>
+                {% if selected_company %}
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-times"></i> Limpar
+                </a>
                 {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Content Row -->
+    <div class="row">
+        <!-- Empresas Card -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                {% if selected_company %}Empresa Selecionada{% else %}Total de Empresas{% endif %}
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_companies }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-building fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usuários Hotspot Card -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Usuários Hotspot
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_hotspot_users }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-wifi fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Perfis Card -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Perfis
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_profiles }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-user-cog fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usuários Sistema Card -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Usuários Sistema
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_users }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Sistema</h5>
+
+    <!-- Content Row -->
+    <div class="row">
+        <!-- Usuários Recentes -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Usuários Recentes</h6>
+                </div>
+                <div class="card-body">
+                    {% if recent_users %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Usuário</th>
+                                        <th>Empresa</th>
+                                        <th>Data</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in recent_users %}
+                                    <tr>
+                                        <td>{{ user[0] }}</td>
+                                        <td>{{ user[2] }}</td>
+                                        <td>{{ user[1][:10] if user[1] else 'N/A' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="fas fa-users fa-3x mb-3"></i>
+                            <p>Nenhum usuário encontrado</p>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <small class="text-muted">Status do Sistema</small>
-                    <div class="d-flex align-items-center">
-                        <span class="badge bg-success me-2">Online</span>
-                        <small>Funcionando normalmente</small>
-                    </div>
+        </div>
+
+        <!-- Créditos por Empresa -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Créditos por Empresa</h6>
                 </div>
-                
-                <div class="mb-3">
-                    <small class="text-muted">Filtro Ativo</small>
-                    <div>
-                        <small>
-                            {% if selected_company %}
-                                {% for company in companies %}
-                                    {% if company.id == selected_company %}
-                                        {{ company.name }}
+                <div class="card-body">
+                    {% if credits_by_company %}
+                        {% for company in credits_by_company %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-sm font-weight-bold">{{ company[0] }}</span>
+                                <span class="text-sm">
+                                    {% if company[1] >= 1024 %}
+                                        {{ "%.2f"|format(company[1] / 1024) }} GB
+                                    {% else %}
+                                        {{ company[1] }} MB
                                     {% endif %}
-                                {% endfor %}
-                            {% else %}
-                                Todas as empresas
-                            {% endif %}
-                        </small>
-                    </div>
+                                </span>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                {% set usage_percent = (company[2] / company[1] * 100) if company[1] > 0 else 0 %}
+                                <div class="progress-bar bg-success" role="progressbar" 
+                                     style="width: {{ usage_percent }}%" 
+                                     aria-valuenow="{{ usage_percent }}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                </div>
+                            </div>
+                            <div class="text-xs text-muted mt-1">
+                                Usado: 
+                                {% if company[2] >= 1024 %}
+                                    {{ "%.2f"|format(company[2] / 1024) }} GB
+                                {% else %}
+                                    {{ company[2] }} MB
+                                {% endif %}
+                                ({{ "%.1f"|format(usage_percent) }}%)
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                            <p>Nenhum dado de créditos disponível</p>
+                        </div>
+                    {% endif %}
                 </div>
-                
-                <button class="btn btn-outline-primary btn-sm w-100" onclick="updateCredits()">
-                    <i class="bi bi-arrow-clockwise"></i> Atualizar Créditos
-                </button>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-function filterByCompany(companyId) {
-    const url = new URL(window.location);
-    if (companyId) {
-        url.searchParams.set('company_id', companyId);
-    } else {
-        url.searchParams.delete('company_id');
-    }
-    window.location.href = url.toString();
-}
-
-function updateCredits() {
-    fetch('/api/update-credits', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert('Créditos atualizados com sucesso!');
-            location.reload();
-        } else {
-            alert('Erro ao atualizar créditos: ' + data.message);
-        }
-    })
-    .catch(error => {
-        alert('Erro na requisição: ' + error);
-    });
-}
-</script>
 {% endblock %}
