@@ -183,125 +183,256 @@
                 font-size: 0.875rem;
             }
 
-            .chart-placeholder {
+            .chart-container {
                 background: white;
                 border-radius: 8px;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                 padding: 2rem;
-                text-align: center;
-                color: #6b7280;
                 margin-bottom: 2rem;
             }
 
-            .chart-placeholder h3 {
+            .chart-container h3 {
                 margin-bottom: 1rem;
                 color: #1f2937;
+                font-size: 1.25rem;
+                font-weight: 600;
+            }
+
+            .stats-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 2rem;
+                margin: 2rem 0;
+            }
+
+            .stat-item {
+                text-align: center;
+            }
+
+            .stat-value {
+                font-size: 2rem;
+                font-weight: bold;
+                margin-bottom: 0.5rem;
+            }
+
+            .stat-label {
+                font-size: 0.875rem;
+                color: #6b7280;
+            }
+
+            .chart-placeholder {
+                background: #f9fafb;
+                border: 2px dashed #d1d5db;
+                border-radius: 8px;
+                padding: 3rem;
+                text-align: center;
+                color: #6b7280;
+                margin: 1rem 0;
+            }
+
+            .data-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 1rem;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 0.75rem;
+                text-align: left;
+                border-bottom: 1px solid #e5e7eb;
+            }
+
+            .data-table th {
+                background: #f9fafb;
+                font-weight: 600;
+                color: #374151;
+            }
+
+            .data-table tr:hover {
+                background: #f9fafb;
             }
         </style>
 
-        <div class="filters-section">
+        <form method="GET" class="filters-section">
             <h3 class="filters-title">Filtros de Relatório</h3>
             <div class="filters-grid">
                 <div class="form-group">
                     <label class="form-label">Período</label>
-                    <select class="form-select">
-                        <option>Últimos 7 dias</option>
-                        <option>Últimos 30 dias</option>
-                        <option>Últimos 3 meses</option>
-                        <option>Personalizado</option>
+                    <select name="period" class="form-select" onchange="toggleCustomDates()">
+                        <option value="7" {% if selected_period == '7' %}selected{% endif %}>Últimos 7 dias</option>
+                        <option value="30" {% if selected_period == '30' %}selected{% endif %}>Últimos 30 dias</option>
+                        <option value="90" {% if selected_period == '90' %}selected{% endif %}>Últimos 3 meses</option>
+                        <option value="custom" {% if selected_period == 'custom' %}selected{% endif %}>Personalizado</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Empresa</label>
-                    <select class="form-select">
-                        <option>Todas as empresas</option>
-                        <option>TechCorp</option>
-                        <option>NetSolutions</option>
+                    <select name="company" class="form-select">
+                        <option value="">Todas as empresas</option>
+                        {% for company in companies_list %}
+                        <option value="{{ company.id }}" {% if selected_company == company.id %}selected{% endif %}>
+                            {{ company.name }}
+                        </option>
+                        {% endfor %}
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="start-date-group" style="display: {% if selected_period == 'custom' %}block{% else %}none{% endif %};">
                     <label class="form-label">Data Inicial</label>
-                    <input type="date" class="form-input">
+                    <input type="date" name="start_date" class="form-input" value="{{ selected_start_date }}">
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="end-date-group" style="display: {% if selected_period == 'custom' %}block{% else %}none{% endif %};">
                     <label class="form-label">Data Final</label>
-                    <input type="date" class="form-input">
+                    <input type="date" name="end_date" class="form-input" value="{{ selected_end_date }}">
                 </div>
             </div>
-            <button class="btn-primary">Aplicar Filtros</button>
-        </div>
+            <button type="submit" class="btn-primary">Aplicar Filtros</button>
+            <a href="{{ url_for('reports') }}" class="btn-secondary" style="margin-left: 0.5rem;">Limpar Filtros</a>
+        </form>
 
-        <div class="reports-grid">
-            <div class="report-card">
-                <div class="report-icon icon-usage">📊</div>
-                <div class="report-title">Uso de Dados</div>
-                <div class="report-description">Relatório detalhado do consumo de dados por usuário e período</div>
-                <div class="report-actions">
-                    <button class="btn-sm btn-primary">Visualizar</button>
-                    <button class="btn-sm btn-secondary">Exportar</button>
-                </div>
-            </div>
-
-            <div class="report-card">
-                <div class="report-icon icon-users">👥</div>
-                <div class="report-title">Usuários Ativos</div>
-                <div class="report-description">Análise de usuários ativos, inativos e padrões de uso</div>
-                <div class="report-actions">
-                    <button class="btn-sm btn-primary">Visualizar</button>
-                    <button class="btn-sm btn-secondary">Exportar</button>
-                </div>
-            </div>
-
-            <div class="report-card">
-                <div class="report-icon icon-companies">🏢</div>
-                <div class="report-title">Performance por Empresa</div>
-                <div class="report-description">Comparativo de uso e performance entre empresas</div>
-                <div class="report-actions">
-                    <button class="btn-sm btn-primary">Visualizar</button>
-                    <button class="btn-sm btn-secondary">Exportar</button>
-                </div>
-            </div>
-
-            <div class="report-card">
-                <div class="report-icon icon-credits">💳</div>
-                <div class="report-title">Gestão de Créditos</div>
-                <div class="report-description">Relatório de distribuição e consumo de créditos</div>
-                <div class="report-actions">
-                    <button class="btn-sm btn-primary">Visualizar</button>
-                    <button class="btn-sm btn-secondary">Exportar</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="chart-placeholder">
-            <h3>Gráfico de Uso de Dados</h3>
-            <p>📈 Aqui será exibido um gráfico interativo com os dados filtrados</p>
-            <p style="font-size: 0.875rem; margin-top: 1rem;">
-                Selecione os filtros acima e clique em "Aplicar Filtros" para visualizar os dados
-            </p>
-        </div>
-
-        <div class="chart-placeholder">
+        <div class="chart-container">
             <h3>Estatísticas Gerais</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2rem; margin-top: 2rem;">
-                <div>
-                    <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">0</div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">Sessões Hoje</div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" style="color: #3b82f6;">{{ stats.total_users or 0 }}</div>
+                    <div class="stat-label">Total de Usuários</div>
                 </div>
-                <div>
-                    <div style="font-size: 2rem; font-weight: bold; color: #10b981;">0 MB</div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">Dados Consumidos</div>
+                <div class="stat-item">
+                    <div class="stat-value" style="color: #10b981;">{{ stats.active_users or 0 }}</div>
+                    <div class="stat-label">Usuários Ativos</div>
                 </div>
-                <div>
-                    <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">0</div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">Usuários Online</div>
+                <div class="stat-item">
+                    <div class="stat-value" style="color: #f59e0b;">{{ stats.total_companies or 0 }}</div>
+                    <div class="stat-label">Empresas</div>
                 </div>
-                <div>
-                    <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;">0%</div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">Taxa de Uso</div>
+                <div class="stat-item">
+                    <div class="stat-value" style="color: #8b5cf6;">{{ "%.1f"|format((stats.used_data_mb or 0) / 1024) }} GB</div>
+                    <div class="stat-label">Dados Consumidos</div>
                 </div>
             </div>
         </div>
+
+        <div class="chart-container">
+            <h3>Uso de Dados por Empresa</h3>
+            <div class="chart-placeholder">
+                <p>📊 Gráfico de Uso por Empresa</p>
+                <p style="font-size: 0.875rem; margin-top: 1rem;">
+                    Dados baseados nos filtros aplicados
+                </p>
+            </div>
+            {% if chart_data.usage_by_company.labels %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Empresa</th>
+                        <th>Dados Consumidos (MB)</th>
+                        <th>Dados Consumidos (GB)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(chart_data.usage_by_company.labels|length) %}
+                    <tr>
+                        <td>{{ chart_data.usage_by_company.labels[i] }}</td>
+                        <td>{{ chart_data.usage_by_company.data[i] or 0 }}</td>
+                        <td>{{ "%.2f"|format((chart_data.usage_by_company.data[i] or 0) / 1024) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+
+        <div class="chart-container">
+            <h3>Usuários por Turma</h3>
+            <div class="chart-placeholder">
+                <p>👥 Gráfico de Usuários por Turma</p>
+                <p style="font-size: 0.875rem; margin-top: 1rem;">
+                    Distribuição de usuários entre as turmas A e B
+                </p>
+            </div>
+            {% if chart_data.users_by_turma.labels %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Turma</th>
+                        <th>Total de Usuários</th>
+                        <th>Usuários Ativos</th>
+                        <th>Taxa de Ativação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(chart_data.users_by_turma.labels|length) %}
+                    <tr>
+                        <td>{{ chart_data.users_by_turma.labels[i] }}</td>
+                        <td>{{ chart_data.users_by_turma.data[i] or 0 }}</td>
+                        <td>{{ chart_data.users_by_turma.active_data[i] or 0 }}</td>
+                        <td>
+                            {% if chart_data.users_by_turma.data[i] and chart_data.users_by_turma.data[i] > 0 %}
+                                {{ "%.1f"|format((chart_data.users_by_turma.active_data[i] or 0) * 100 / chart_data.users_by_turma.data[i]) }}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+
+        <div class="chart-container">
+            <h3>Evolução de Créditos</h3>
+            <div class="chart-placeholder">
+                <p>📈 Gráfico de Evolução dos Créditos</p>
+                <p style="font-size: 0.875rem; margin-top: 1rem;">
+                    Histórico de créditos totais e utilizados ao longo do tempo
+                </p>
+            </div>
+            {% if chart_data.credits_timeline.labels %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Créditos Totais (MB)</th>
+                        <th>Créditos Utilizados (MB)</th>
+                        <th>Taxa de Uso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(chart_data.credits_timeline.labels|length) %}
+                    <tr>
+                        <td>{{ chart_data.credits_timeline.labels[i] }}</td>
+                        <td>{{ chart_data.credits_timeline.total_data[i] or 0 }}</td>
+                        <td>{{ chart_data.credits_timeline.used_data[i] or 0 }}</td>
+                        <td>
+                            {% if chart_data.credits_timeline.total_data[i] and chart_data.credits_timeline.total_data[i] > 0 %}
+                                {{ "%.1f"|format((chart_data.credits_timeline.used_data[i] or 0) * 100 / chart_data.credits_timeline.total_data[i]) }}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+
+        <script>
+            function toggleCustomDates() {
+                const periodSelect = document.querySelector('select[name="period"]');
+                const startDateGroup = document.getElementById('start-date-group');
+                const endDateGroup = document.getElementById('end-date-group');
+                
+                if (periodSelect.value === 'custom') {
+                    startDateGroup.style.display = 'block';
+                    endDateGroup.style.display = 'block';
+                } else {
+                    startDateGroup.style.display = 'none';
+                    endDateGroup.style.display = 'none';
+                }
+            }
+        </script>
     </main>
 </div>
 {% endblock %}

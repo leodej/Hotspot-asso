@@ -647,7 +647,137 @@ def credits():
 @require_auth
 def reports():
     """Página de relatórios"""
-    return render_template('reports.html', user={'name': session.get('name')})
+    # Obter filtros da URL
+    period = request.args.get('period', '7')
+    company_filter = request.args.get('company', '')
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    
+    conn = get_db()
+    
+    # Calcular período baseado na seleção
+    if period == 'custom' and start_date and end_date:
+        date_filter = f"DATE(uc.created_at) BETWEEN '{start_date}' AND '{end_date}'"
+    elif period == '7':
+        date_filter = "DATE(uc.created_at) >= DATE('now', '-7 days')"
+    elif period == '30':
+        date_filter = "DATE(uc.created_at) >= DATE('now', '-30 days')"
+    elif period == '90':
+        date_filter = "DATE(uc.created_at) >= DATE('now', '-90 days')"
+    else:
+        date_filter = "1=1"  # Sem filtro de data
+    
+    # Query base para estatísticas
+    stats_query = f'''
+        SELECT 
+            COUNT(DISTINCT hu.id) as total_users,
+            COUNT(DISTINCT CASE WHEN hu.active = 1 THEN hu.id END) as active_users,
+            COUNT(DISTINCT c.id) as total_companies,
+            SUM(uc.total_mb) as total_data_mb,
+            SUM(uc.used_mb) as used_data_mb,
+            SUM(uc.remaining_mb) as remaining_data_mb
+        FROM user_credits uc
+        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
+        JOIN companies c ON hu.company_id = c.id
+        WHERE {date_filter}
+    '''
+    
+    params = []
+    if company_filter:
+        stats_query += ' AND c.id = ?'
+        params.append(company_filter)
+    
+    stats_result = conn.execute(stats_query, params).fetchone()
+    
+    # Dados para gráfico de uso por empresa
+    usage_by_company_query = f'''
+        SELECT c.name as company_name, 
+               SUM(uc.used_mb) as used_mb,
+               COUNT(hu.id) as user_count
+        FROM user_credits uc
+        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
+        JOIN companies c ON hu.company_id = c.id
+        WHERE {date_filter}
+    '''
+    
+    usage_params = []
+    if company_filter:
+        usage_by_company_query += ' AND c.id = ?'
+        usage_params.append(company_filter)
+    
+    usage_by_company_query += ' GROUP BY c.id, c.name ORDER BY used_mb DESC'
+    usage_by_company = conn.execute(usage_by_company_query, usage_params).fetchall()
+    
+    # Dados para gráfico de usuários por turma
+    users_by_turma_query = f'''
+        SELECT hu.turma, 
+               COUNT(hu.id) as user_count,
+               COUNT(CASE WHEN hu.active = 1 THEN 1 END) as active_count
+        FROM hotspot_users hu
+        JOIN companies c ON hu.company_id = c.id
+        JOIN user_credits uc ON hu.id = uc.hotspot_user_id
+        WHERE {date_filter}
+    '''
+    
+    turma_params = []
+    if company_filter:
+        users_by_turma_query += ' AND c.id = ?'
+        turma_params.append(company_filter)
+    
+    users_by_turma_query += ' GROUP BY hu.turma ORDER BY hu.turma'
+    users_by_turma = conn.execute(users_by_turma_query, turma_params).fetchall()
+    
+    # Dados para gráfico de créditos ao longo do tempo
+    credits_timeline_query = f'''
+        SELECT DATE(uc.created_at) as date,
+               SUM(uc.total_mb) as total_mb,
+               SUM(uc.used_mb) as used_mb
+        FROM user_credits uc
+        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
+        JOIN companies c ON hu.company_id = c.id
+        WHERE {date_filter}
+    '''
+    
+    timeline_params = []
+    if company_filter:
+        credits_timeline_query += ' AND c.id = ?'
+        timeline_params.append(company_filter)
+    
+    credits_timeline_query += ' GROUP BY DATE(uc.created_at) ORDER BY date DESC LIMIT 30'
+    credits_timeline = conn.execute(credits_timeline_query, timeline_params).fetchall()
+    
+    # Buscar empresas para o filtro
+    companies_list = conn.execute('SELECT * FROM companies WHERE active = 1 ORDER BY name').fetchall()
+    
+    conn.close()
+    
+    # Preparar dados para os gráficos
+    chart_data = {
+        'usage_by_company': {
+            'labels': [row['company_name'] for row in usage_by_company],
+            'data': [row['used_mb'] for row in usage_by_company]
+        },
+        'users_by_turma': {
+            'labels': [f"Turma {row['turma']}" for row in users_by_turma],
+            'data': [row['user_count'] for row in users_by_turma],
+            'active_data': [row['active_count'] for row in users_by_turma]
+        },
+        'credits_timeline': {
+            'labels': [row['date'] for row in reversed(credits_timeline)],
+            'total_data': [row['total_mb'] for row in reversed(credits_timeline)],
+            'used_data': [row['used_mb'] for row in reversed(credits_timeline)]
+        }
+    }
+    
+    return render_template('reports.html', 
+                         user={'name': session.get('name')},
+                         stats=stats_result,
+                         chart_data=chart_data,
+                         companies_list=companies_list,
+                         selected_period=period,
+                         selected_company=company_filter,
+                         selected_start_date=start_date,
+                         selected_end_date=end_date)
 
 @app.route('/settings', methods=['GET', 'POST'])
 @require_auth
