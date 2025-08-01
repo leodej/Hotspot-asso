@@ -167,41 +167,71 @@
 
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-title">Total de Usuários</div>
+                <div class="stat-title">Total de Usuários Hotspot</div>
                 <div class="stat-value">{{ stats.total_users }}</div>
-                <div class="stat-change">+12% em relação ao mês passado</div>
+                <div class="stat-change">Usuários cadastrados no sistema</div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-title">Empresas Ativas</div>
                 <div class="stat-value">{{ stats.active_companies }}</div>
-                <div class="stat-change">+3 novas empresas este mês</div>
+                <div class="stat-change">Empresas configuradas</div>
             </div>
 
             <div class="stat-card">
-                <div class="stat-title">Conexões Ativas</div>
-                <div class="stat-value">{{ stats.active_connections }}</div>
-                <div class="stat-change">+8% desde ontem</div>
+                <div class="stat-title">Perfis Hotspot</div>
+                <div class="stat-value">{{ stats.total_profiles }}</div>
+                <div class="stat-change">Perfis de acesso criados</div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-title">Créditos Totais</div>
-                <div class="stat-value">R$ {{ "{:,.0f}".format(stats.total_credits) }}</div>
-                <div class="stat-change">+15% em relação ao mês passado</div>
+                <div class="stat-value">
+                    {% if stats.total_credits_mb >= 1024 %}
+                        {{ "%.1f"|format(stats.total_credits_mb / 1024) }} GB
+                    {% else %}
+                        {{ stats.total_credits_mb }} MB
+                    {% endif %}
+                </div>
+                <div class="stat-change">Créditos disponíveis no sistema</div>
             </div>
         </div>
 
         <div class="activity-section">
             <h2 class="section-title">Atividade Recente</h2>
-            {% for activity in activities %}
-            <div class="activity-item">
-                <div class="activity-dot {{ activity.type }}"></div>
-                <div class="activity-content">
-                    <h4>{{ activity.title }}</h4>
-                    <p>{{ activity.description }}</p>
+            {% if activities %}
+                {% for activity in activities %}
+                <div class="activity-item">
+                    <div class="activity-dot success"></div>
+                    <div class="activity-content">
+                        <h4>{{ activity.title }}</h4>
+                        <p>{{ activity.description }}</p>
+                    </div>
                 </div>
-            </div>
-            {% endfor %}
+                {% endfor %}
+            {% else %}
+                <div class="activity-item">
+                    <div class="activity-dot info"></div>
+                    <div class="activity-content">
+                        <h4>Sistema Iniciado</h4>
+                        <p>MikroTik Manager está funcionando corretamente</p>
+                    </div>
+                </div>
+                <div class="activity-item">
+                    <div class="activity-dot success"></div>
+                    <div class="activity-content">
+                        <h4>Banco de Dados</h4>
+                        <p>Todas as tabelas foram criadas com sucesso</p>
+                    </div>
+                </div>
+                <div class="activity-item">
+                    <div class="activity-dot warning"></div>
+                    <div class="activity-content">
+                        <h4>Configuração</h4>
+                        <p>Configure suas empresas e perfis para começar</p>
+                    </div>
+                </div>
+            {% endif %}
         </div>
     </main>
 </div>

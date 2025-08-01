@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Sistema de Créditos - MikroTik Manager{% endblock %}
+{% block title %}Créditos - MikroTik Manager{% endblock %}
 
 {% block body %}
 <div class="container">
@@ -44,10 +44,20 @@
     </aside>
 
     <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
         <div class="header">
             <div>
-                <h1>Sistema de Créditos</h1>
-                <p>Gerencie créditos de dados em MB/GB</p>
+                <h1>Gerenciamento de Créditos</h1>
+                <p>Controle de créditos de dados dos usuários</p>
             </div>
             <div class="user-info">
                 <span class="user-name">{{ user.name }}</span>
@@ -56,39 +66,14 @@
         </div>
 
         <style>
-            .credits-overview {
+            .stats-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
                 gap: 1.5rem;
                 margin-bottom: 2rem;
             }
 
-            .credit-card {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 1.5rem;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            }
-
-            .credit-card h3 {
-                font-size: 0.875rem;
-                margin-bottom: 0.5rem;
-                opacity: 0.9;
-            }
-
-            .credit-amount {
-                font-size: 2rem;
-                font-weight: bold;
-                margin-bottom: 0.25rem;
-            }
-
-            .credit-unit {
-                font-size: 0.75rem;
-                opacity: 0.8;
-            }
-
-            .stats-card {
+            .stat-card {
                 background: white;
                 padding: 1.5rem;
                 border-radius: 8px;
@@ -96,209 +81,221 @@
                 text-align: center;
             }
 
-            .stat-number {
-                font-size: 1.5rem;
+            .stat-value {
+                font-size: 2rem;
                 font-weight: bold;
+                margin-bottom: 0.5rem;
                 color: #1f2937;
-                margin-bottom: 0.25rem;
             }
 
             .stat-label {
                 font-size: 0.875rem;
                 color: #6b7280;
+                font-weight: 500;
             }
 
-            .credits-table {
+            .stat-card.total { border-left: 4px solid #3b82f6; }
+            .stat-card.used { border-left: 4px solid #ef4444; }
+            .stat-card.remaining { border-left: 4px solid #10b981; }
+            .stat-card.users { border-left: 4px solid #f59e0b; }
+
+            .table-section {
                 background: white;
                 border-radius: 8px;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                 overflow: hidden;
-                margin-bottom: 2rem;
             }
 
-            .section-header {
-                padding: 1.5rem;
-                border-bottom: 1px solid #f3f4f6;
+            .table-header {
+                background: #f9fafb;
+                padding: 1rem 1.5rem;
+                border-bottom: 1px solid #e5e7eb;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
             }
 
-            .section-title {
-                font-size: 1.25rem;
-                font-weight: 600;
+            .table-header h3 {
+                margin: 0;
                 color: #1f2937;
             }
 
-            table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-
-            th, td {
-                padding: 1rem;
-                text-align: left;
-                border-bottom: 1px solid #f3f4f6;
-            }
-
-            th {
-                background: #f9fafb;
-                font-weight: 600;
-                color: #374151;
-                font-size: 0.875rem;
-            }
-
-            .credit-bar {
-                width: 100%;
-                height: 8px;
-                background: #f3f4f6;
-                border-radius: 4px;
-                overflow: hidden;
-                margin-top: 0.5rem;
-            }
-
-            .credit-progress {
-                height: 100%;
-                background: linear-gradient(90deg, #10b981, #059669);
-                transition: width 0.3s ease;
-            }
-
-            .credit-info {
-                font-size: 0.875rem;
-            }
-
-            .credit-remaining {
-                color: #10b981;
-                font-weight: 600;
-            }
-
-            .credit-used {
-                color: #ef4444;
-                font-weight: 600;
-            }
-
-            .btn-primary {
+            .btn {
                 background: #3b82f6;
                 color: white;
                 border: none;
                 padding: 0.5rem 1rem;
                 border-radius: 6px;
                 cursor: pointer;
-                text-decoration: none;
-                display: inline-block;
+                font-weight: 500;
+                transition: background-color 0.2s;
+                font-size: 0.875rem;
             }
 
-            .btn-update {
+            .btn:hover {
+                background: #2563eb;
+            }
+
+            .btn-success {
                 background: #10b981;
-                color: white;
-                border: none;
-                padding: 0.75rem 1.5rem;
-                border-radius: 6px;
-                cursor: pointer;
-                margin-bottom: 1rem;
+            }
+
+            .btn-success:hover {
+                background: #059669;
+            }
+
+            .table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            .table th, .table td {
+                padding: 1rem 1.5rem;
+                text-align: left;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            .table th {
+                background: #f9fafb;
+                font-weight: 600;
+                color: #374151;
+            }
+
+            .table tr:hover {
+                background: #f9fafb;
+            }
+
+            .progress-bar {
+                width: 100px;
+                height: 8px;
+                background: #e5e7eb;
+                border-radius: 4px;
+                overflow: hidden;
+            }
+
+            .progress-fill {
+                height: 100%;
+                background: #10b981;
+                transition: width 0.3s;
+            }
+
+            .progress-fill.warning {
+                background: #f59e0b;
+            }
+
+            .progress-fill.danger {
+                background: #ef4444;
+            }
+
+            .credit-info {
+                font-size: 0.8rem;
+                color: #6b7280;
+                margin-top: 0.25rem;
             }
         </style>
 
-        <div class="credits-overview">
-            <div class="credit-card">
-                <h3>Total de Créditos</h3>
-                <div class="credit-amount">
+        <!-- Estatísticas de Créditos -->
+        <div class="stats-grid">
+            <div class="stat-card total">
+                <div class="stat-value">
                     {% if stats.total_credits_mb >= 1024 %}
                         {{ "%.1f"|format(stats.total_credits_mb / 1024) }} GB
                     {% else %}
                         {{ stats.total_credits_mb }} MB
                     {% endif %}
                 </div>
-                <div class="credit-unit">Créditos totais distribuídos</div>
+                <div class="stat-label">Total de Créditos</div>
             </div>
 
-            <div class="stats-card">
-                <div class="stat-number">
+            <div class="stat-card used">
+                <div class="stat-value">
                     {% if stats.used_credits_mb >= 1024 %}
                         {{ "%.1f"|format(stats.used_credits_mb / 1024) }} GB
                     {% else %}
                         {{ stats.used_credits_mb }} MB
                     {% endif %}
                 </div>
-                <div class="stat-label">Dados Consumidos</div>
+                <div class="stat-label">Créditos Utilizados</div>
             </div>
 
-            <div class="stats-card">
-                <div class="stat-number">
+            <div class="stat-card remaining">
+                <div class="stat-value">
                     {% if stats.remaining_credits_mb >= 1024 %}
                         {{ "%.1f"|format(stats.remaining_credits_mb / 1024) }} GB
                     {% else %}
                         {{ stats.remaining_credits_mb }} MB
                     {% endif %}
                 </div>
-                <div class="stat-label">Dados Disponíveis</div>
+                <div class="stat-label">Créditos Restantes</div>
             </div>
 
-            <div class="stats-card">
-                <div class="stat-number">{{ stats.active_users }}</div>
+            <div class="stat-card users">
+                <div class="stat-value">{{ stats.active_users }}</div>
                 <div class="stat-label">Usuários Ativos</div>
             </div>
         </div>
 
-        <button class="btn-update" onclick="updateCredits()">🔄 Atualizar Créditos Cumulativos</button>
-
-        <div class="credits-table">
-            <div class="section-header">
-                <h2 class="section-title">Créditos por Usuário</h2>
-                <button class="btn-primary">Exportar Relatório</button>
+        <!-- Lista de Créditos por Usuário -->
+        <div class="table-section">
+            <div class="table-header">
+                <h3>Créditos por Usuário</h3>
+                <button class="btn btn-success" onclick="updateAllCredits()">
+                    Atualizar Todos os Créditos
+                </button>
             </div>
-            <table>
+            <table class="table">
                 <thead>
                     <tr>
                         <th>Usuário</th>
                         <th>Nome</th>
                         <th>Empresa</th>
-                        <th>Créditos</th>
-                        <th>Uso</th>
+                        <th>Total</th>
+                        <th>Usado</th>
+                        <th>Restante</th>
+                        <th>Progresso</th>
                         <th>Último Reset</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for credit in credits_list %}
                     <tr>
-                        <td><strong>{{ credit.username }}</strong></td>
+                        <td>{{ credit.username }}</td>
                         <td>{{ credit.full_name or '-' }}</td>
                         <td>{{ credit.company_name }}</td>
-                        <td class="credit-info">
-                            <div class="credit-remaining">
-                                {% if credit.remaining_mb >= 1024 %}
-                                    {{ "%.1f"|format(credit.remaining_mb / 1024) }} GB restantes
-                                {% else %}
-                                    {{ credit.remaining_mb }} MB restantes
-                                {% endif %}
-                            </div>
-                            <div class="credit-bar">
-                                {% set usage_percent = (credit.used_mb / credit.total_mb * 100) if credit.total_mb > 0 else 0 %}
-                                <div class="credit-progress" style="width: {{ usage_percent }}%"></div>
-                            </div>
+                        <td>
+                            {% if credit.total_mb >= 1024 %}
+                                {{ "%.1f"|format(credit.total_mb / 1024) }} GB
+                            {% else %}
+                                {{ credit.total_mb }} MB
+                            {% endif %}
                         </td>
-                        <td class="credit-info">
-                            <div class="credit-used">
-                                {% if credit.used_mb >= 1024 %}
-                                    {{ "%.1f"|format(credit.used_mb / 1024) }} GB usados
-                                {% else %}
-                                    {{ credit.used_mb }} MB usados
-                                {% endif %}
+                        <td>
+                            {% if credit.used_mb >= 1024 %}
+                                {{ "%.1f"|format(credit.used_mb / 1024) }} GB
+                            {% else %}
+                                {{ credit.used_mb }} MB
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if credit.remaining_mb >= 1024 %}
+                                {{ "%.1f"|format(credit.remaining_mb / 1024) }} GB
+                            {% else %}
+                                {{ credit.remaining_mb }} MB
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set usage_percent = (credit.used_mb / credit.total_mb * 100) if credit.total_mb > 0 else 0 %}
+                            <div class="progress-bar">
+                                <div class="progress-fill {{ 'danger' if usage_percent > 80 else 'warning' if usage_percent > 60 else '' }}" 
+                                     style="width: {{ usage_percent }}%"></div>
                             </div>
-                            <div style="font-size: 0.75rem; color: #6b7280;">
-                                de 
-                                {% if credit.total_mb >= 1024 %}
-                                    {{ "%.1f"|format(credit.total_mb / 1024) }} GB
-                                {% else %}
-                                    {{ credit.total_mb }} MB
-                                {% endif %}
-                            </div>
+                            <div class="credit-info">{{ "%.1f"|format(usage_percent) }}%</div>
                         </td>
                         <td>{{ credit.last_reset or 'Nunca' }}</td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" style="text-align: center; color: #6b7280;">
+                        <td colspan="8" style="text-align: center; color: #6b7280; padding: 2rem;">
                             Nenhum crédito encontrado
                         </td>
                     </tr>
@@ -308,8 +305,8 @@
         </div>
 
         <script>
-            function updateCredits() {
-                if (confirm('Deseja atualizar os créditos cumulativos de todos os usuários?')) {
+            function updateAllCredits() {
+                if (confirm('Deseja atualizar os créditos de todos os usuários?')) {
                     fetch('/api/update-credits', {
                         method: 'POST',
                         headers: {

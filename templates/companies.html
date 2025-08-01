@@ -44,10 +44,20 @@
     </aside>
 
     <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
         <div class="header">
             <div>
-                <h1>Gerenciamento de Empresas</h1>
-                <p>Gerencie empresas e suas configurações MikroTik</p>
+                <h1>Empresas</h1>
+                <p>Gerenciar empresas e conexões MikroTik</p>
             </div>
             <div class="user-info">
                 <span class="user-name">{{ user.name }}</span>
@@ -198,6 +208,118 @@
                 border-radius: 6px;
                 cursor: pointer;
             }
+
+            .form-section {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                margin-bottom: 2rem;
+            }
+
+            .form-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            .form-group {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .form-group label {
+                font-weight: 500;
+                margin-bottom: 0.5rem;
+                color: #374151;
+            }
+
+            .form-group input {
+                padding: 0.75rem;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                font-size: 0.875rem;
+            }
+
+            .form-group input:focus {
+                outline: none;
+                border-color: #3b82f6;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            }
+
+            .btn {
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 500;
+                transition: background-color 0.2s;
+            }
+
+            .btn:hover {
+                background: #2563eb;
+            }
+
+            .table-section {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+
+            .table-header {
+                background: #f9fafb;
+                padding: 1rem 1.5rem;
+                border-bottom: 1px solid #e5e7eb;
+            }
+
+            .table-header h3 {
+                margin: 0;
+                color: #1f2937;
+            }
+
+            .table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            .table th, .table td {
+                padding: 1rem 1.5rem;
+                text-align: left;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            .table th {
+                background: #f9fafb;
+                font-weight: 600;
+                color: #374151;
+            }
+
+            .table tr:hover {
+                background: #f9fafb;
+            }
+
+            .badge {
+                display: inline-block;
+                padding: 0.25rem 0.75rem;
+                border-radius: 9999px;
+                font-size: 0.75rem;
+                font-weight: 500;
+            }
+
+            .badge-success {
+                background: #d1fae5;
+                color: #065f46;
+            }
+
+            .connection-info {
+                font-family: monospace;
+                font-size: 0.8rem;
+                color: #6b7280;
+            }
         </style>
 
         <div class="action-bar">
@@ -205,87 +327,79 @@
             <button class="btn-primary" onclick="openModal()">+ Nova Empresa</button>
         </div>
 
-        <div class="companies-grid">
-            {% for company in companies_list %}
-            <div class="company-card">
-                <div class="company-name">{{ company.name }}</div>
-                <div class="company-info">
-                    <div class="info-item">
-                        <span class="info-label">IP do Roteador:</span>
-                        <span class="info-value">{{ company.mikrotik_ip }}</span>
+        <!-- Formulário de Cadastro -->
+        <div class="form-section">
+            <h3 style="margin-bottom: 1rem;">Cadastrar Nova Empresa</h3>
+            <form method="POST">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="name">Nome da Empresa</label>
+                        <input type="text" id="name" name="name" required>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">Porta:</span>
-                        <span class="info-value">{{ company.mikrotik_port }}</span>
+                    <div class="form-group">
+                        <label for="mikrotik_ip">IP do MikroTik</label>
+                        <input type="text" id="mikrotik_ip" name="mikrotik_ip" placeholder="192.168.1.1" required>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">Usuários Ativos:</span>
-                        <span class="info-value">{{ company.user_count }}</span>
+                    <div class="form-group">
+                        <label for="mikrotik_port">Porta API</label>
+                        <input type="number" id="mikrotik_port" name="mikrotik_port" value="8728" required>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">Criado em:</span>
-                        <span class="info-value">{{ company.created_at }}</span>
+                    <div class="form-group">
+                        <label for="mikrotik_user">Usuário MikroTik</label>
+                        <input type="text" id="mikrotik_user" name="mikrotik_user" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="mikrotik_password">Senha MikroTik</label>
+                        <input type="password" id="mikrotik_password" name="mikrotik_password" required>
                     </div>
                 </div>
-            </div>
-            {% else %}
-            <div class="company-card add-company-card" onclick="openModal()">
-                <div class="add-icon">+</div>
-                <h3>Adicionar Nova Empresa</h3>
-                <p>Clique para cadastrar uma nova empresa</p>
-            </div>
-            {% endfor %}
+                <button type="submit" class="btn">Cadastrar Empresa</button>
+            </form>
         </div>
 
-        <!-- Modal de Cadastro -->
-        <div id="companyModal" class="modal">
-            <div class="modal-content">
-                <h3>Cadastrar Nova Empresa</h3>
-                <form method="POST">
-                    <div class="form-group">
-                        <label class="form-label">Nome da Empresa</label>
-                        <input type="text" name="name" class="form-input" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">IP do MikroTik</label>
-                        <input type="text" name="mikrotik_ip" class="form-input" placeholder="192.168.1.1" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Porta</label>
-                        <input type="number" name="mikrotik_port" class="form-input" value="8728" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Usuário MikroTik</label>
-                        <input type="text" name="mikrotik_user" class="form-input" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Senha MikroTik</label>
-                        <input type="password" name="mikrotik_password" class="form-input" required>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
-                        <button type="submit" class="btn-primary">Cadastrar</button>
-                    </div>
-                </form>
+        <!-- Lista de Empresas -->
+        <div class="table-section">
+            <div class="table-header">
+                <h3>Empresas Cadastradas</h3>
             </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Conexão MikroTik</th>
+                        <th>Usuários</th>
+                        <th>Data de Cadastro</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for company in companies_list %}
+                    <tr>
+                        <td>{{ company.name }}</td>
+                        <td>
+                            <div class="connection-info">
+                                {{ company.mikrotik_ip }}:{{ company.mikrotik_port }}<br>
+                                <small>Usuário: {{ company.mikrotik_user }}</small>
+                            </div>
+                        </td>
+                        <td>{{ company.user_count }} usuários</td>
+                        <td>{{ company.created_at[:10] }}</td>
+                        <td>
+                            <span class="badge badge-success">
+                                {{ 'Ativa' if company.active else 'Inativa' }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #6b7280; padding: 2rem;">
+                            Nenhuma empresa cadastrada
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-
-        <script>
-            function openModal() {
-                document.getElementById('companyModal').style.display = 'block';
-            }
-
-            function closeModal() {
-                document.getElementById('companyModal').style.display = 'none';
-            }
-
-            window.onclick = function(event) {
-                const modal = document.getElementById('companyModal');
-                if (event.target == modal) {
-                    modal.style.display = 'none';
-                }
-            }
-        </script>
     </main>
 </div>
 {% endblock %}
