@@ -2,39 +2,39 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    // Simular dados do dashboard (em produção, buscar do banco de dados)
+    // Simular dados do dashboard
     const stats = {
-      totalUsers: 1247,
-      totalCompanies: 23,
-      activeConnections: 892,
-      totalCredits: 45230,
+      totalUsers: 156,
+      totalCompanies: 12,
+      activeConnections: 89,
+      totalCredits: 25000,
       systemStatus: "online",
       networkHealth: 98,
       topUsers: [
         {
-          username: "joao.silva",
+          username: "João Silva",
           company: "Empresa Alpha",
           traffic: "2.5 GB",
           status: "online" as const,
         },
         {
-          username: "maria.santos",
+          username: "Maria Santos",
           company: "Empresa Beta",
           traffic: "1.8 GB",
           status: "online" as const,
         },
         {
-          username: "pedro.costa",
+          username: "Pedro Costa",
           company: "Empresa Gamma",
-          traffic: "1.2 GB",
+          traffic: "3.2 GB",
           status: "offline" as const,
         },
       ],
       systemHealth: {
         cpu: 45,
         memory: 62,
-        disk: 38,
-        uptime: "15d 8h 23m",
+        disk: 78,
+        uptime: "15d 8h 32m",
       },
     }
 

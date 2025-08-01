@@ -27,6 +27,8 @@ export default function LoginPage() {
     setError("")
 
     try {
+      console.log("Iniciando login...")
+
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -36,25 +38,30 @@ export default function LoginPage() {
       })
 
       const data = await response.json()
+      console.log("Resposta do login:", data)
 
       if (response.ok && data.success) {
-        // Salvar token no cookie
-        document.cookie = `auth-token=${data.token}; path=/; max-age=86400; secure; samesite=strict`
+        console.log("Login bem-sucedido, salvando token...")
+
+        // Salvar token no cookie com configurações corretas
+        const expires = new Date()
+        expires.setTime(expires.getTime() + 24 * 60 * 60 * 1000) // 24 horas
+        document.cookie = `auth-token=${data.token}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`
 
         // Salvar dados do usuário no localStorage
         localStorage.setItem("user", JSON.stringify(data.user))
 
-        console.log("Login realizado, redirecionando para dashboard...")
+        console.log("Token salvo, redirecionando...")
 
-        // Redirecionar para dashboard
-        router.push("/dashboard")
-        router.refresh()
+        // Forçar redirecionamento
+        window.location.href = "/dashboard"
       } else {
+        console.error("Erro no login:", data.message)
         setError(data.message || "Erro ao fazer login")
       }
     } catch (err) {
-      console.error("Erro no login:", err)
-      setError("Erro de conexão")
+      console.error("Erro na requisição:", err)
+      setError("Erro de conexão com o servidor")
     } finally {
       setLoading(false)
     }
@@ -90,6 +97,7 @@ export default function LoginPage() {
                 value={formData.email}
                 onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                 required
+                disabled={loading}
               />
             </div>
 
@@ -103,6 +111,7 @@ export default function LoginPage() {
                   value={formData.password}
                   onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
                   required
+                  disabled={loading}
                 />
                 <Button
                   type="button"
@@ -110,6 +119,7 @@ export default function LoginPage() {
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
+                  disabled={loading}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
@@ -122,8 +132,11 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Usuário demo: admin@demo.com</p>
-            <p>Senha demo: admin123</p>
+            <p>
+              <strong>Credenciais de teste:</strong>
+            </p>
+            <p>Email: admin@demo.com</p>
+            <p>Senha: admin123</p>
           </div>
         </CardContent>
       </Card>

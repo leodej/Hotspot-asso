@@ -39,19 +39,32 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
 
-    console.log(`Tentativa de login: ${email}`)
+    console.log(`[LOGIN] Tentativa de login para: ${email}`)
 
     // Validar se email e password foram fornecidos
     if (!email || !password) {
-      return NextResponse.json({ message: "Email e senha são obrigatórios" }, { status: 400 })
+      console.log("[LOGIN] Email ou senha não fornecidos")
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Email e senha são obrigatórios",
+        },
+        { status: 400 },
+      )
     }
 
     // Buscar usuário
     const user = users.find((u) => u.email === email && u.password === password)
 
     if (!user) {
-      console.log(`Login falhou para: ${email}`)
-      return NextResponse.json({ message: "Credenciais inválidas" }, { status: 401 })
+      console.log(`[LOGIN] Credenciais inválidas para: ${email}`)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Credenciais inválidas",
+        },
+        { status: 401 },
+      )
     }
 
     // Gerar JWT token
@@ -66,10 +79,12 @@ export async function POST(request: NextRequest) {
       { expiresIn: "24h" },
     )
 
-    console.log(`Login realizado com sucesso: ${user.email} - ${new Date().toISOString()}`)
+    console.log(`[LOGIN] Login realizado com sucesso para: ${user.email}`)
 
-    return NextResponse.json({
+    // Retornar resposta de sucesso
+    const response = NextResponse.json({
       success: true,
+      message: "Login realizado com sucesso",
       token,
       user: {
         id: user.id,
@@ -78,8 +93,25 @@ export async function POST(request: NextRequest) {
         name: user.name,
       },
     })
+
+    // Definir cookie no servidor também
+    response.cookies.set("auth-token", token, {
+      httpOnly: false,
+      secure: false, // Para desenvolvimento local
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60, // 24 horas
+      path: "/",
+    })
+
+    return response
   } catch (error) {
-    console.error("Erro no login:", error)
-    return NextResponse.json({ message: "Erro interno do servidor" }, { status: 500 })
+    console.error("[LOGIN] Erro no servidor:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Erro interno do servidor",
+      },
+      { status: 500 },
+    )
   }
 }

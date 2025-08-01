@@ -8,14 +8,16 @@ export default function HomePage() {
 
   useEffect(() => {
     // Verificar se há token de autenticação
-    const cookies = document.cookie.split(";")
-    const authToken = cookies.find((cookie) => cookie.trim().startsWith("auth-token="))
+    const token = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("auth-token="))
+      ?.split("=")[1]
 
-    if (authToken) {
-      // Se autenticado, redirecionar para dashboard
+    if (token) {
+      // Se há token, redirecionar para dashboard
       router.push("/dashboard")
     } else {
-      // Se não autenticado, redirecionar para login
+      // Se não há token, redirecionar para login
       router.push("/auth/login")
     }
   }, [router])

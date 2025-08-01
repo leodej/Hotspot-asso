@@ -29,16 +29,18 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
-    totalUsers: 0,
-    totalCompanies: 0,
-    activeConnections: 0,
-    totalCredits: 0,
-    systemStatus: "loading",
-    networkHealth: 0,
+    totalUsers: 156,
+    totalCompanies: 12,
+    activeConnections: 89,
+    totalCredits: 25000,
+    systemStatus: "online",
+    networkHealth: 98,
   })
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    console.log("[DASHBOARD] Página do dashboard carregada")
+
     const fetchStats = async () => {
       try {
         const response = await fetch("/api/dashboard/stats")

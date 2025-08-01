@@ -101,17 +101,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     // Verificar se há dados do usuário no localStorage
     const userData = localStorage.getItem("user")
     if (userData) {
-      setUser(JSON.parse(userData))
+      try {
+        setUser(JSON.parse(userData))
+      } catch (error) {
+        console.error("Erro ao parsear dados do usuário:", error)
+      }
     }
   }, [])
 
   const handleLogout = () => {
+    console.log("Fazendo logout...")
+
     // Limpar dados de autenticação
     document.cookie = "auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;"
     localStorage.removeItem("user")
 
     // Redirecionar para login
-    router.push("/auth/login")
+    window.location.href = "/auth/login"
   }
 
   return (

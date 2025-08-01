@@ -7,12 +7,12 @@ echo "================================"
 echo "⏹️  Parando containers..."
 docker-compose down
 
-# Limpar cache do Docker se necessário
-echo "🧹 Limpando cache..."
-docker system prune -f
+# Limpar containers antigos
+echo "🧹 Limpando containers antigos..."
+docker-compose rm -f
 
-# Construir e iniciar novamente
-echo "🚀 Construindo e iniciando..."
+# Reconstruir e iniciar
+echo "🔨 Reconstruindo e iniciando..."
 docker-compose up -d --build
 
 # Aguardar containers iniciarem
@@ -28,3 +28,5 @@ echo "✅ Sistema reiniciado!"
 echo "🌐 Acesse: http://localhost:3000"
 echo "👤 Login: admin@demo.com"
 echo "🔑 Senha: admin123"
+echo ""
+echo "📋 Para ver logs: ./scripts/logs.sh"
