@@ -1,10 +1,11 @@
 #!/bin/bash
 
-# Mostrar logs de todos os serviços
-if [ -z "$1" ]; then
-    echo "📝 Logs de todos os serviços:"
-    docker-compose logs -f
+SERVICE=${1:-""}
+
+if [ -z "$SERVICE" ]; then
+    echo "📋 Mostrando logs de todos os serviços..."
+    docker-compose logs -f --tail=100
 else
-    echo "📝 Logs do serviço: $1"
-    docker-compose logs -f $1
+    echo "📋 Mostrando logs do serviço: $SERVICE"
+    docker-compose logs -f --tail=100 $SERVICE
 fi

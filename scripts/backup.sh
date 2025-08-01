@@ -1,23 +1,28 @@
 #!/bin/bash
 
 BACKUP_DIR="./backups"
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="mikrotik_manager_backup_$DATE.sql"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+BACKUP_FILE="mikrotik_manager_backup_${TIMESTAMP}.sql.gz"
 
-echo "💾 Criando backup do banco de dados..."
+echo "💾 Iniciando backup do banco de dados..."
 
 # Criar diretório de backup se não existir
 mkdir -p $BACKUP_DIR
 
-# Fazer backup do PostgreSQL
-docker-compose exec -T postgres pg_dump -U mikrotik mikrotik_manager > "$BACKUP_DIR/$BACKUP_FILE"
+# Fazer backup do banco de dados
+docker-compose exec -T postgres pg_dump -U mikrotik mikrotik_manager | gzip > "$BACKUP_DIR/$BACKUP_FILE"
 
-# Comprimir o backup
-gzip "$BACKUP_DIR/$BACKUP_FILE"
-
-echo "✅ Backup criado: $BACKUP_DIR/$BACKUP_FILE.gz"
-
-# Limpar backups antigos (manter apenas os últimos 7 dias)
-find $BACKUP_DIR -name "*.gz" -mtime +7 -delete
-
-echo "🧹 Backups antigos removidos."
+if [ $? -eq 0 ]; then
+    echo "✅ Backup criado com sucesso: $BACKUP_DIR/$BACKUP_FILE"
+    
+    # Limpar backups antigos (manter apenas os últimos 10)
+    cd $BACKUP_DIR
+    ls -t mikrotik_manager_backup_*.sql.gz | tail -n +11 | xargs -r rm
+    echo "🧹 Backups antigos removidos"
+    
+    # Mostrar tamanho do backup
+    echo "📊 Tamanho do backup: $(du -h $BACKUP_FILE | cut -f1)"
+else
+    echo "❌ Erro ao criar backup"
+    exit 1
+fi

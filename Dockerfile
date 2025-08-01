@@ -6,9 +6,11 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Instalar dependências baseado no gerenciador de pacotes preferido
+# Copiar arquivos de dependências
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production
+
+# Instalar dependências
+RUN npm ci --omit=dev
 
 # Rebuild o código fonte apenas quando necessário
 FROM base AS builder
@@ -19,6 +21,7 @@ COPY . .
 # Desabilitar telemetria durante build
 ENV NEXT_TELEMETRY_DISABLED 1
 
+# Build da aplicação
 RUN npm run build
 
 # Imagem de produção, copiar todos os arquivos e executar next
@@ -32,6 +35,7 @@ ENV NEXT_TELEMETRY_DISABLED 1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Copiar arquivos públicos
 COPY --from=builder /app/public ./public
 
 # Definir as permissões corretas para cache pré-renderizado
@@ -51,6 +55,6 @@ ENV HOSTNAME "0.0.0.0"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
 CMD ["node", "server.js"]

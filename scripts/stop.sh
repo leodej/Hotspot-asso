@@ -1,8 +1,11 @@
 #!/bin/bash
 
-echo "🛑 Parando MikroTik Manager..."
+echo "🛑 Parando MIKROTIK MANAGER..."
 
-# Parar todos os serviços
+# Parar todos os containers
 docker-compose down
 
-echo "✅ Todos os serviços foram parados."
+echo "✅ Containers parados com sucesso!"
+
+# Mostrar status
+docker-compose ps
