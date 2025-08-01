@@ -1,12 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  experimental: {
-    serverComponentsExternalPackages: ['jsonwebtoken'],
-  },
-  env: {
-    JWT_SECRET: process.env.JWT_SECRET || 'mikrotik-manager-super-secret-key',
-  },
+  trailingSlash: true,
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -15,6 +10,14 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/',
+        destination: '/index.html',
+      },
+    ]
   },
 }
 

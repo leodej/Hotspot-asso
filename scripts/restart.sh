@@ -3,16 +3,16 @@
 echo "🔄 Reiniciando MIKROTIK MANAGER..."
 echo "================================"
 
-# Parar containers
+# Parar containers existentes
 echo "⏹️  Parando containers..."
 docker-compose down
 
-# Limpar containers antigos
-echo "🧹 Limpando containers antigos..."
-docker-compose rm -f
+# Limpar containers órfãos
+echo "🧹 Limpando containers órfãos..."
+docker-compose down --remove-orphans
 
-# Reconstruir e iniciar
-echo "🔨 Reconstruindo e iniciando..."
+# Construir e iniciar
+echo "🔨 Construindo e iniciando containers..."
 docker-compose up -d --build
 
 # Aguardar containers iniciarem
@@ -26,7 +26,7 @@ docker-compose ps
 echo ""
 echo "✅ Sistema reiniciado!"
 echo "🌐 Acesse: http://localhost:3000"
-echo "👤 Login: admin@demo.com"
+echo "📧 Login: admin@demo.com"
 echo "🔑 Senha: admin123"
 echo ""
-echo "📋 Para ver logs: ./scripts/logs.sh"
+echo "🔍 Para ver logs: ./scripts/logs.sh"
