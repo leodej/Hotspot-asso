@@ -2,10 +2,10 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { verify } from "jsonwebtoken"
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
+const JWT_SECRET = process.env.JWT_SECRET || "mikrotik-manager-super-secret-key"
 
 // Rotas que não precisam de autenticação
-const publicRoutes = ["/auth/login", "/auth/register", "/api/auth/login", "/api/auth/register"]
+const publicRoutes = ["/auth/login", "/auth/register", "/api/auth/login", "/api/auth/register", "/api/health"]
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -15,7 +15,22 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Verificar token de autenticação
+  // Redirecionar root para dashboard se autenticado, senão para login
+  if (pathname === "/") {
+    const token = request.cookies.get("auth-token")?.value
+    if (token) {
+      try {
+        verify(token, JWT_SECRET)
+        return NextResponse.redirect(new URL("/dashboard", request.url))
+      } catch (error) {
+        return NextResponse.redirect(new URL("/auth/login", request.url))
+      }
+    } else {
+      return NextResponse.redirect(new URL("/auth/login", request.url))
+    }
+  }
+
+  // Verificar token de autenticação para rotas protegidas
   const token = request.cookies.get("auth-token")?.value
 
   if (!token) {

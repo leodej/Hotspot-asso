@@ -37,13 +37,23 @@ export default function LoginPage() {
 
       const data = await response.json()
 
-      if (response.ok) {
+      if (response.ok && data.success) {
+        // Salvar token no cookie
         document.cookie = `auth-token=${data.token}; path=/; max-age=86400; secure; samesite=strict`
+
+        // Salvar dados do usuário no localStorage
+        localStorage.setItem("user", JSON.stringify(data.user))
+
+        console.log("Login realizado, redirecionando para dashboard...")
+
+        // Redirecionar para dashboard
         router.push("/dashboard")
+        router.refresh()
       } else {
         setError(data.message || "Erro ao fazer login")
       }
     } catch (err) {
+      console.error("Erro no login:", err)
       setError("Erro de conexão")
     } finally {
       setLoading(false)

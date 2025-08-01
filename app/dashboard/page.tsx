@@ -1,86 +1,119 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, Building2, Activity, Download, Upload, Clock, Wifi, AlertTriangle, CheckCircle } from "lucide-react"
-import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { Button } from "@/components/ui/button"
+import {
+  Users,
+  Building2,
+  Wifi,
+  CreditCard,
+  Activity,
+  AlertTriangle,
+  CheckCircle,
+  Router,
+  Signal,
+  Zap,
+} from "lucide-react"
 
 interface DashboardStats {
   totalUsers: number
-  activeUsers: number
   totalCompanies: number
-  activeCompanies: number
-  totalTraffic: {
-    download: string
-    upload: string
-  }
-  topUsers: Array<{
-    username: string
-    company: string
-    traffic: string
-    status: "online" | "offline"
-  }>
-  systemHealth: {
-    cpu: number
-    memory: number
-    disk: number
-    uptime: string
-  }
+  activeConnections: number
+  totalCredits: number
+  systemStatus: string
+  networkHealth: number
 }
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [stats, setStats] = useState<DashboardStats>({
+    totalUsers: 0,
+    totalCompanies: 0,
+    activeConnections: 0,
+    totalCredits: 0,
+    systemStatus: "loading",
+    networkHealth: 0,
+  })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchDashboardData()
-    const interval = setInterval(fetchDashboardData, 30000) // Atualiza a cada 30s
+    const fetchStats = async () => {
+      try {
+        const response = await fetch("/api/dashboard/stats")
+        if (response.ok) {
+          const data = await response.json()
+          setStats(data)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar estatísticas:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+    // Atualizar a cada 30 segundos
+    const interval = setInterval(fetchStats, 30000)
     return () => clearInterval(interval)
   }, [])
 
-  const fetchDashboardData = async () => {
-    try {
-      const response = await fetch("/api/dashboard/stats")
-      const data = await response.json()
-      setStats(data)
-    } catch (error) {
-      console.error("Erro ao carregar dados do dashboard:", error)
-    } finally {
-      setLoading(false)
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "online":
+        return "bg-green-500"
+      case "warning":
+        return "bg-yellow-500"
+      case "error":
+        return "bg-red-500"
+      default:
+        return "bg-gray-500"
     }
   }
 
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      </DashboardLayout>
-    )
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "online":
+        return <CheckCircle className="h-4 w-4" />
+      case "warning":
+        return <AlertTriangle className="h-4 w-4" />
+      case "error":
+        return <AlertTriangle className="h-4 w-4" />
+      default:
+        return <Activity className="h-4 w-4" />
+    }
   }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Visão geral do sistema MikroTik Manager</p>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">Visão geral do sistema MikroTik Manager</p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Badge variant={stats.systemStatus === "online" ? "default" : "destructive"}>
+              {getStatusIcon(stats.systemStatus)}
+              <span className="ml-1">
+                {stats.systemStatus === "online" ? "Sistema Online" : "Sistema com Problemas"}
+              </span>
+            </Badge>
+          </div>
         </div>
 
-        {/* Cards de Estatísticas */}
+        {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Usuários Ativos</CardTitle>
+              <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.activeUsers || 0}</div>
-              <p className="text-xs text-muted-foreground">de {stats?.totalUsers || 0} usuários totais</p>
+              <div className="text-2xl font-bold">{loading ? "..." : stats.totalUsers}</div>
+              <p className="text-xs text-muted-foreground">+12% em relação ao mês passado</p>
             </CardContent>
           </Card>
 
@@ -90,182 +123,142 @@ export default function DashboardPage() {
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.activeCompanies || 0}</div>
-              <p className="text-xs text-muted-foreground">de {stats?.totalCompanies || 0} empresas totais</p>
+              <div className="text-2xl font-bold">{loading ? "..." : stats.totalCompanies}</div>
+              <p className="text-xs text-muted-foreground">+3 novas empresas este mês</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Download Total</CardTitle>
-              <Download className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Conexões Ativas</CardTitle>
+              <Wifi className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalTraffic.download || "0 GB"}</div>
-              <p className="text-xs text-muted-foreground">Tráfego de download hoje</p>
+              <div className="text-2xl font-bold">{loading ? "..." : stats.activeConnections}</div>
+              <p className="text-xs text-muted-foreground">+8% desde ontem</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Upload Total</CardTitle>
-              <Upload className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Créditos Totais</CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalTraffic.upload || "0 GB"}</div>
-              <p className="text-xs text-muted-foreground">Tráfego de upload hoje</p>
+              <div className="text-2xl font-bold">R$ {loading ? "..." : stats.totalCredits.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">+15% em relação ao mês passado</p>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="users">Top Usuários</TabsTrigger>
-            <TabsTrigger value="system">Sistema</TabsTrigger>
-          </TabsList>
+        {/* System Status */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Router className="mr-2 h-5 w-5" />
+                Status dos Roteadores
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Online</span>
+                  <Badge variant="default">24</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Offline</span>
+                  <Badge variant="destructive">2</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Manutenção</span>
+                  <Badge variant="secondary">1</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          <TabsContent value="overview" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Atividade em Tempo Real</CardTitle>
-                  <CardDescription>Monitoramento de conexões ativas</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Wifi className="h-4 w-4 text-green-500" />
-                        <span className="text-sm">Conexões Ativas</span>
-                      </div>
-                      <Badge variant="secondary">{stats?.activeUsers || 0}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Activity className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm">Taxa de Transferência</span>
-                      </div>
-                      <Badge variant="outline">125 Mbps</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Clock className="h-4 w-4 text-orange-500" />
-                        <span className="text-sm">Tempo Médio de Sessão</span>
-                      </div>
-                      <Badge variant="outline">2h 15m</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Signal className="mr-2 h-5 w-5" />
+                Saúde da Rede
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Latência Média</span>
+                  <span className="text-sm font-medium">12ms</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Uptime</span>
+                  <span className="text-sm font-medium">99.8%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Throughput</span>
+                  <span className="text-sm font-medium">850 Mbps</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Status das Empresas</CardTitle>
-                  <CardDescription>Conectividade com roteadores MikroTik</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Empresa Alpha</span>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <Badge variant="secondary">Online</Badge>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Empresa Beta</span>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <Badge variant="secondary">Online</Badge>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Empresa Gamma</span>
-                      <div className="flex items-center space-x-2">
-                        <AlertTriangle className="h-4 w-4 text-red-500" />
-                        <Badge variant="destructive">Offline</Badge>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Zap className="mr-2 h-5 w-5" />
+                Ações Rápidas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                <Users className="mr-2 h-4 w-4" />
+                Adicionar Usuário
+              </Button>
+              <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                <Building2 className="mr-2 h-4 w-4" />
+                Nova Empresa
+              </Button>
+              <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                <Wifi className="mr-2 h-4 w-4" />
+                Configurar Hotspot
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Atividade Recente</CardTitle>
+            <CardDescription>Últimas ações realizadas no sistema</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Novo usuário cadastrado</p>
+                  <p className="text-xs text-muted-foreground">João Silva - há 5 minutos</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Roteador conectado</p>
+                  <p className="text-xs text-muted-foreground">192.168.1.1 - há 12 minutos</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Backup realizado</p>
+                  <p className="text-xs text-muted-foreground">Sistema - há 1 hora</p>
+                </div>
+              </div>
             </div>
-          </TabsContent>
-
-          <TabsContent value="users" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Usuários por Tráfego</CardTitle>
-                <CardDescription>Usuários com maior consumo de dados hoje</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {stats?.topUsers?.map((user, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-blue-600">{index + 1}</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{user.username}</p>
-                          <p className="text-xs text-muted-foreground">{user.company}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={user.status === "online" ? "secondary" : "outline"}>
-                          {user.status === "online" ? "Online" : "Offline"}
-                        </Badge>
-                        <span className="text-sm font-medium">{user.traffic}</span>
-                      </div>
-                    </div>
-                  )) || <p className="text-center text-muted-foreground py-4">Nenhum dado disponível</p>}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="system" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Saúde do Sistema</CardTitle>
-                <CardDescription>Monitoramento de recursos do servidor</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">CPU</span>
-                      <span className="text-sm text-muted-foreground">{stats?.systemHealth.cpu || 0}%</span>
-                    </div>
-                    <Progress value={stats?.systemHealth.cpu || 0} className="h-2" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Memória</span>
-                      <span className="text-sm text-muted-foreground">{stats?.systemHealth.memory || 0}%</span>
-                    </div>
-                    <Progress value={stats?.systemHealth.memory || 0} className="h-2" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Disco</span>
-                      <span className="text-sm text-muted-foreground">{stats?.systemHealth.disk || 0}%</span>
-                    </div>
-                    <Progress value={stats?.systemHealth.disk || 0} className="h-2" />
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <span className="text-sm font-medium">Uptime</span>
-                    <span className="text-sm text-muted-foreground">{stats?.systemHealth.uptime || "0d 0h 0m"}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   )
