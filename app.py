@@ -239,23 +239,39 @@ def dashboard():
     """Dashboard principal"""
     conn = get_db()
     
-    # Estatísticas reais
-    stats = {
-        'total_users': conn.execute('SELECT COUNT(*) as count FROM hotspot_users WHERE active = 1').fetchone()['count'],
-        'active_companies': conn.execute('SELECT COUNT(*) as count FROM companies WHERE active = 1').fetchone()['count'],
-        'total_profiles': conn.execute('SELECT COUNT(*) as count FROM hotspot_profiles WHERE active = 1').fetchone()['count'],
-        'total_credits_mb': conn.execute('SELECT SUM(remaining_mb) as total FROM user_credits').fetchone()['total'] or 0
-    }
+    # Estatísticas reais com tratamento de valores nulos
+    stats = {}
+    
+    # Total de usuários hotspot
+    result = conn.execute('SELECT COUNT(*) as count FROM hotspot_users WHERE active = 1').fetchone()
+    stats['total_users'] = result['count'] if result else 0
+    
+    # Empresas ativas
+    result = conn.execute('SELECT COUNT(*) as count FROM companies WHERE active = 1').fetchone()
+    stats['active_companies'] = result['count'] if result else 0
+    
+    # Perfis hotspot
+    result = conn.execute('SELECT COUNT(*) as count FROM hotspot_profiles WHERE active = 1').fetchone()
+    stats['total_profiles'] = result['count'] if result else 0
+    
+    # Créditos totais (remaining_mb)
+    result = conn.execute('SELECT SUM(remaining_mb) as total FROM user_credits').fetchone()
+    stats['total_credits_mb'] = result['total'] if result and result['total'] else 0
     
     # Atividades recentes
-    activities = conn.execute('''
-        SELECT 'user' as type, 'Novo usuário cadastrado' as title, 
-               full_name || ' - ' || datetime(created_at, 'localtime') as description
-        FROM hotspot_users 
-        WHERE active = 1 
-        ORDER BY created_at DESC 
-        LIMIT 5
-    ''').fetchall()
+    activities = []
+    try:
+        activities = conn.execute('''
+            SELECT 'user' as type, 'Novo usuário cadastrado' as title, 
+                   COALESCE(full_name, username) || ' - ' || datetime(created_at, 'localtime') as description
+            FROM hotspot_users 
+            WHERE active = 1 
+            ORDER BY created_at DESC 
+            LIMIT 5
+        ''').fetchall()
+    except Exception as e:
+        print(f"Erro ao buscar atividades: {e}")
+        activities = []
     
     conn.close()
     
