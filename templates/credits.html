@@ -130,6 +130,63 @@
                 color: #1f2937;
             }
 
+            .filters-container {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                margin-bottom: 2rem;
+                display: flex;
+                gap: 1rem;
+                align-items: center;
+                flex-wrap: wrap;
+            }
+
+            .filter-group {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .filter-label {
+                font-size: 0.875rem;
+                font-weight: 600;
+                color: #374151;
+            }
+
+            .filter-select {
+                padding: 0.5rem;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                background: white;
+                font-size: 0.875rem;
+                min-width: 150px;
+            }
+
+            .filter-button {
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 0.875rem;
+                margin-top: 1.5rem;
+            }
+
+            .clear-filters {
+                background: #6b7280;
+                color: white;
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 0.875rem;
+                margin-top: 1.5rem;
+                text-decoration: none;
+                display: inline-block;
+            }
+
             table {
                 width: 100%;
                 border-collapse: collapse;
@@ -199,6 +256,40 @@
             }
         </style>
 
+        <!-- Filtros -->
+        <div class="filters-container">
+            <form method="GET" style="display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;">
+                <div class="filter-group">
+                    <label class="filter-label">Empresa:</label>
+                    <select name="company" class="filter-select">
+                        <option value="">Todas as empresas</option>
+                        {% for company in companies_list %}
+                        <option value="{{ company.id }}" {% if selected_company == company.id %}selected{% endif %}>
+                            {{ company.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label class="filter-label">Mês:</label>
+                    <select name="month" class="filter-select">
+                        <option value="">Todos os meses</option>
+                        {% for month in months_list %}
+                        <option value="{{ month.month_year }}" {% if selected_month == month.month_year %}selected{% endif %}>
+                            {% set year, month_num = month.month_year.split('-') %}
+                            {% set month_names = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'] %}
+                            {{ month_names[month_num|int] }} {{ year }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="submit" class="filter-button">Filtrar</button>
+                <a href="{{ url_for('credits') }}" class="clear-filters">Limpar Filtros</a>
+            </form>
+        </div>
+
         <div class="credits-overview">
             <div class="credit-card">
                 <h3>Total de Créditos</h3>
@@ -244,7 +335,12 @@
 
         <div class="credits-table">
             <div class="section-header">
-                <h2 class="section-title">Créditos por Usuário</h2>
+                <h2 class="section-title">
+                    Créditos por Usuário 
+                    {% if selected_company or selected_month %}
+                        ({{ credits_list|length }} encontrados)
+                    {% endif %}
+                </h2>
                 <button class="btn-primary">Exportar Relatório</button>
             </div>
             <table>
@@ -299,7 +395,11 @@
                     {% else %}
                     <tr>
                         <td colspan="6" style="text-align: center; color: #6b7280;">
-                            Nenhum crédito encontrado
+                            {% if selected_company or selected_month %}
+                                Nenhum crédito encontrado com os filtros aplicados
+                            {% else %}
+                                Nenhum crédito encontrado
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

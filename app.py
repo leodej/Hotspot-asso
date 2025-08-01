@@ -555,25 +555,81 @@ def edit_hotspot_user():
 @require_auth
 def credits():
     """Página de créditos"""
+    # Obter filtros da URL
+    company_filter = request.args.get('company', '')
+    month_filter = request.args.get('month', '')
+    
     conn = get_db()
     
-    # Estatísticas de créditos
-    stats = {
-        'total_credits_mb': conn.execute('SELECT SUM(total_mb) as total FROM user_credits').fetchone()['total'] or 0,
-        'used_credits_mb': conn.execute('SELECT SUM(used_mb) as total FROM user_credits').fetchone()['total'] or 0,
-        'remaining_credits_mb': conn.execute('SELECT SUM(remaining_mb) as total FROM user_credits').fetchone()['total'] or 0,
-        'active_users': conn.execute('SELECT COUNT(*) as count FROM hotspot_users WHERE active = 1').fetchone()['count']
-    }
-    
-    # Lista de créditos por usuário
-    credits_list = conn.execute('''
+    # Construir query base
+    base_query = '''
         SELECT hu.username, hu.full_name, c.name as company_name,
-               uc.total_mb, uc.used_mb, uc.remaining_mb, uc.last_reset, uc.updated_at
+               uc.total_mb, uc.used_mb, uc.remaining_mb, uc.last_reset, uc.updated_at,
+               c.id as company_id, strftime('%Y-%m', uc.created_at) as month_year
         FROM user_credits uc
         JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
         JOIN companies c ON hu.company_id = c.id
         WHERE hu.active = 1
-        ORDER BY uc.updated_at DESC
+    '''
+    
+    params = []
+    
+    # Aplicar filtro de empresa
+    if company_filter:
+        base_query += ' AND c.id = ?'
+        params.append(company_filter)
+    
+    # Aplicar filtro de mês
+    if month_filter:
+        base_query += ' AND strftime("%Y-%m", uc.created_at) = ?'
+        params.append(month_filter)
+    
+    base_query += ' ORDER BY uc.updated_at DESC'
+    
+    # Buscar créditos filtrados
+    credits_list = conn.execute(base_query, params).fetchall()
+    
+    # Calcular estatísticas baseadas nos filtros
+    stats_query = '''
+        SELECT 
+            SUM(uc.total_mb) as total_credits_mb,
+            SUM(uc.used_mb) as used_credits_mb,
+            SUM(uc.remaining_mb) as remaining_credits_mb,
+            COUNT(DISTINCT hu.id) as active_users
+        FROM user_credits uc
+        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
+        JOIN companies c ON hu.company_id = c.id
+        WHERE hu.active = 1
+    '''
+    
+    stats_params = []
+    if company_filter:
+        stats_query += ' AND c.id = ?'
+        stats_params.append(company_filter)
+    
+    if month_filter:
+        stats_query += ' AND strftime("%Y-%m", uc.created_at) = ?'
+        stats_params.append(month_filter)
+    
+    stats_result = conn.execute(stats_query, stats_params).fetchone()
+    
+    stats = {
+        'total_credits_mb': stats_result['total_credits_mb'] or 0,
+        'used_credits_mb': stats_result['used_credits_mb'] or 0,
+        'remaining_credits_mb': stats_result['remaining_credits_mb'] or 0,
+        'active_users': stats_result['active_users'] or 0
+    }
+    
+    # Buscar empresas para o filtro
+    companies_list = conn.execute('SELECT * FROM companies WHERE active = 1 ORDER BY name').fetchall()
+    
+    # Buscar meses disponíveis para o filtro
+    months_list = conn.execute('''
+        SELECT DISTINCT strftime('%Y-%m', uc.created_at) as month_year
+        FROM user_credits uc
+        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
+        WHERE hu.active = 1 AND uc.created_at IS NOT NULL
+        ORDER BY month_year DESC
     ''').fetchall()
     
     conn.close()
@@ -581,7 +637,11 @@ def credits():
     return render_template('credits.html', 
                          user={'name': session.get('name')}, 
                          stats=stats,
-                         credits_list=credits_list)
+                         credits_list=credits_list,
+                         companies_list=companies_list,
+                         months_list=months_list,
+                         selected_company=company_filter,
+                         selected_month=month_filter)
 
 @app.route('/reports')
 @require_auth
