@@ -616,15 +616,14 @@ def companies():
         WHERE active = 1 
         ORDER BY created_at DESC
     ''').fetchall()
-    conn.close()
     
     # Buscar configurações atuais
-    conn_settings = get_db()
     current_settings = {}
-    settings_rows = conn_settings.execute('SELECT key, value FROM system_settings').fetchall()
+    settings_rows = conn.execute('SELECT key, value FROM system_settings').fetchall()
     for row in settings_rows:
         current_settings[row['key']] = row['value']
-    conn_settings.close()
+    
+    conn.close()
 
     return render_template('companies.html', 
                          user={'name': session.get('name')}, 
