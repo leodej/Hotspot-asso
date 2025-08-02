@@ -1,344 +1,338 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logs MikroTik - {{ settings.get('system_name', 'MikroTik Manager') }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .sidebar {
-            min-height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .nav-link {
-            color: rgba(255,255,255,0.8) !important;
-            transition: all 0.3s;
-        }
-        .nav-link:hover, .nav-link.active {
-            color: white !important;
-            background-color: rgba(255,255,255,0.1);
-            border-radius: 8px;
-        }
-        .card {
-            border: none;
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-            transition: all 0.3s;
-        }
-        .card:hover {
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-        }
-        .status-success {
-            color: #28a745;
-        }
-        .status-failed {
-            color: #dc3545;
-        }
-        .response-time {
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-        }
-    </style>
-</head>
-<body class="bg-light">
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <div class="text-center mb-4">
-                        {% if settings.get('system_logo') %}
-                            <img src="{{ url_for('uploaded_file', filename=settings['system_logo']) }}" 
-                                 alt="Logo" class="img-fluid mb-2" style="max-height: 50px;">
-                        {% endif %}
-                        <h5 class="text-white">{{ settings.get('system_name', 'MikroTik Manager') }}</h5>
-                        <small class="text-white-50">{{ user.name }}</small>
-                    </div>
-                    
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('dashboard') }}">
-                                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('companies') }}">
-                                <i class="fas fa-building me-2"></i>Empresas
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('profiles') }}">
-                                <i class="fas fa-user-cog me-2"></i>Perfis
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('hotspot_users') }}">
-                                <i class="fas fa-users me-2"></i>Usuários Hotspot
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('credits') }}">
-                                <i class="fas fa-coins me-2"></i>Créditos
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link active" href="{{ url_for('mikrotik_logs') }}">
-                                <i class="fas fa-list-alt me-2"></i>Logs MikroTik
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('reports') }}">
-                                <i class="fas fa-chart-bar me-2"></i>Relatórios
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('users') }}">
-                                <i class="fas fa-user-shield me-2"></i>Usuários Sistema
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('settings') }}">
-                                <i class="fas fa-cog me-2"></i>Configurações
-                            </a>
-                        </li>
-                        <li class="nav-item mt-3">
-                            <a class="nav-link text-danger" href="{{ url_for('logout') }}">
-                                <i class="fas fa-sign-out-alt me-2"></i>Sair
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
+{% extends "base.html" %}
 
-            <!-- Main content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-list-alt me-2"></i>Logs de Conexão MikroTik
-                    </h1>
-                </div>
+{% block title %}Logs MikroTik - MikroTik Manager{% endblock %}
 
-                <!-- Flash Messages -->
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
+{% block body %}
+<div class="container">
+  <aside class="sidebar">
+      <div class="logo">
+          <div class="logo-icon">MT</div>
+          <div class="logo-text">
+              <h2>MikroTik Manager</h2>
+              <p>Sistema de Gestão</p>
+          </div>
+      </div>
 
-                <!-- Estatísticas -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h5 class="card-title text-primary">
-                                    <i class="fas fa-list me-2"></i>Total de Logs
-                                </h5>
-                                <h3 class="text-primary">{{ stats.total_logs or 0 }}</h3>
-                                <small class="text-muted">Últimas 24h</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h5 class="card-title text-success">
-                                    <i class="fas fa-check-circle me-2"></i>Sucessos
-                                </h5>
-                                <h3 class="text-success">{{ stats.success_count or 0 }}</h3>
-                                <small class="text-muted">Conexões bem-sucedidas</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h5 class="card-title text-danger">
-                                    <i class="fas fa-times-circle me-2"></i>Falhas
-                                </h5>
-                                <h3 class="text-danger">{{ stats.failed_count or 0 }}</h3>
-                                <small class="text-muted">Conexões falharam</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h5 class="card-title text-info">
-                                    <i class="fas fa-clock me-2"></i>Tempo Médio
-                                </h5>
-                                <h3 class="text-info">{{ "%.2f"|format(stats.avg_response_time or 0) }}s</h3>
-                                <small class="text-muted">Tempo de resposta</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+      <nav>
+          <ul class="nav-menu">
+              <li class="nav-item">
+                  <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('users') }}" class="nav-link">Usuários</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('companies') }}" class="nav-link">Empresas</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('profiles') }}" class="nav-link">Perfis Hotspot</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('hotspot_users') }}" class="nav-link">Usuários Hotspot</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('credits') }}" class="nav-link">Créditos</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('reports') }}" class="nav-link">Relatórios</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('mikrotik_logs') }}" class="nav-link active">Logs MikroTik</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('settings') }}" class="nav-link">Configurações</a>
+              </li>
+          </ul>
+      </nav>
+  </aside>
 
-                <!-- Filtros -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-filter me-2"></i>Filtros
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <form method="GET" class="row g-3">
-                            <div class="col-md-4">
-                                <label for="company" class="form-label">Empresa</label>
-                                <select class="form-select" id="company" name="company">
-                                    <option value="">Todas as empresas</option>
-                                    {% for company in companies_list %}
-                                        <option value="{{ company.id }}" 
-                                                {% if selected_company == company.id %}selected{% endif %}>
-                                            {{ company.name }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="action" class="form-label">Ação</label>
-                                <select class="form-select" id="action" name="action">
-                                    <option value="">Todas as ações</option>
-                                    <option value="test_connection" {% if selected_action == 'test_connection' %}selected{% endif %}>
-                                        Teste de Conexão
-                                    </option>
-                                    <option value="sync_users" {% if selected_action == 'sync_users' %}selected{% endif %}>
-                                        Sincronização
-                                    </option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="status" class="form-label">Status</label>
-                                <select class="form-select" id="status" name="status">
-                                    <option value="">Todos os status</option>
-                                    <option value="success" {% if selected_status == 'success' %}selected{% endif %}>
-                                        Sucesso
-                                    </option>
-                                    <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>
-                                        Falha
-                                    </option>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">&nbsp;</label>
-                                <div class="d-grid gap-2">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-search me-1"></i>Filtrar
-                                    </button>
-                                    <a href="{{ url_for('mikrotik_logs') }}" class="btn btn-outline-secondary btn-sm">
-                                        Limpar
-                                    </a>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+  <main class="main-content">
+      <div class="header">
+          <div>
+              <h1>Logs de Conexão MikroTik</h1>
+              <p>Monitore todas as conexões e operações com os roteadores</p>
+          </div>
+          <div class="user-info">
+              <span class="user-name">{{ user.name }}</span>
+              <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
+          </div>
+      </div>
 
-                <!-- Tabela de Logs -->
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-history me-2"></i>Histórico de Conexões
-                        </h5>
-                        <small class="text-muted">{{ logs_list|length }} registros encontrados</small>
-                    </div>
-                    <div class="card-body p-0">
-                        {% if logs_list %}
-                            <div class="table-responsive">
-                                <table class="table table-hover mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Data/Hora</th>
-                                            <th>Empresa</th>
-                                            <th>Ação</th>
-                                            <th>Status</th>
-                                            <th>Tempo</th>
-                                            <th>IP:Porta</th>
-                                            <th>Mensagem</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for log in logs_list %}
-                                            <tr>
-                                                <td>
-                                                    <small>{{ log.created_at.strftime('%d/%m/%Y %H:%M:%S') if log.created_at else 'N/A' }}</small>
-                                                </td>
-                                                <td>
-                                                    <strong>{{ log.company_name }}</strong>
-                                                </td>
-                                                <td>
-                                                    {% if log.action == 'test_connection' %}
-                                                        <span class="badge bg-info">
-                                                            <i class="fas fa-plug me-1"></i>Teste
-                                                        </span>
-                                                    {% elif log.action == 'sync_users' %}
-                                                        <span class="badge bg-primary">
-                                                            <i class="fas fa-sync me-1"></i>Sync
-                                                        </span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">{{ log.action }}</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    {% if log.status == 'success' %}
-                                                        <span class="badge bg-success">
-                                                            <i class="fas fa-check me-1"></i>Sucesso
-                                                        </span>
-                                                    {% else %}
-                                                        <span class="badge bg-danger">
-                                                            <i class="fas fa-times me-1"></i>Falha
-                                                        </span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    {% if log.response_time %}
-                                                        <span class="response-time">{{ "%.3f"|format(log.response_time) }}s</span>
-                                                    {% else %}
-                                                        <span class="text-muted">-</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <small class="text-muted">
-                                                        {% if log.ip_address and log.port %}
-                                                            {{ log.ip_address }}:{{ log.port }}
-                                                        {% else %}
-                                                            -
-                                                        {% endif %}
-                                                    </small>
-                                                </td>
-                                                <td>
-                                                    <small class="{% if log.status == 'success' %}text-success{% else %}text-danger{% endif %}">
-                                                        {{ log.message[:100] }}{% if log.message|length > 100 %}...{% endif %}
-                                                    </small>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <div class="text-center py-5">
-                                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                                <h5 class="text-muted">Nenhum log encontrado</h5>
-                                <p class="text-muted">Não há registros de conexão com os filtros aplicados.</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </main>
-        </div>
-    </div>
+      <style>
+          .stats-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              gap: 1rem;
+              margin-bottom: 2rem;
+          }
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Auto-refresh da página a cada 30 segundos
-        setTimeout(function() {
-            location.reload();
-        }, 30000);
-    </script>
-</body>
-</html>
+          .stat-card {
+              background: white;
+              padding: 1.5rem;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              text-align: center;
+          }
+
+          .stat-number {
+              font-size: 2rem;
+              font-weight: bold;
+              color: #1f2937;
+          }
+
+          .stat-label {
+              font-size: 0.875rem;
+              color: #6b7280;
+              margin-top: 0.5rem;
+          }
+
+          .filters-section {
+              background: white;
+              padding: 1.5rem;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              margin-bottom: 2rem;
+          }
+
+          .filters-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              gap: 1rem;
+              margin-bottom: 1rem;
+          }
+
+          .filter-group {
+              display: flex;
+              flex-direction: column;
+          }
+
+          .filter-label {
+              font-size: 0.875rem;
+              font-weight: 500;
+              color: #374151;
+              margin-bottom: 0.5rem;
+          }
+
+          .filter-select {
+              padding: 0.5rem;
+              border: 1px solid #d1d5db;
+              border-radius: 6px;
+              font-size: 0.875rem;
+          }
+
+          .btn-filter {
+              background: #3b82f6;
+              color: white;
+              border: none;
+              padding: 0.5rem 1rem;
+              border-radius: 6px;
+              font-size: 0.875rem;
+              cursor: pointer;
+          }
+
+          .btn-clear {
+              background: #6b7280;
+              color: white;
+              border: none;
+              padding: 0.5rem 1rem;
+              border-radius: 6px;
+              font-size: 0.875rem;
+              cursor: pointer;
+              margin-left: 0.5rem;
+          }
+
+          .logs-table {
+              background: white;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              overflow: hidden;
+          }
+
+          .table-header {
+              background: #f9fafb;
+              padding: 1rem 1.5rem;
+              border-bottom: 1px solid #f3f4f6;
+          }
+
+          .table-title {
+              font-size: 1.125rem;
+              font-weight: 600;
+              color: #1f2937;
+          }
+
+          .table {
+              width: 100%;
+              border-collapse: collapse;
+          }
+
+          .table th,
+          .table td {
+              padding: 0.75rem 1rem;
+              text-align: left;
+              border-bottom: 1px solid #f3f4f6;
+              font-size: 0.875rem;
+          }
+
+          .table th {
+              background: #f9fafb;
+              font-weight: 600;
+              color: #374151;
+          }
+
+          .table td {
+              color: #1f2937;
+          }
+
+          .status-success {
+              color: #059669;
+              font-weight: 500;
+          }
+
+          .status-failed {
+              color: #dc2626;
+              font-weight: 500;
+          }
+
+          .response-time {
+              font-family: monospace;
+              background: #f3f4f6;
+              padding: 0.25rem 0.5rem;
+              border-radius: 4px;
+              font-size: 0.75rem;
+          }
+      </style>
+
+      <!-- Estatísticas -->
+      <div class="stats-grid">
+          <div class="stat-card">
+              <div class="stat-number">{{ stats.total_logs or 0 }}</div>
+              <div class="stat-label">Total de Logs (24h)</div>
+          </div>
+          <div class="stat-card">
+              <div class="stat-number" style="color: #059669;">{{ stats.success_count or 0 }}</div>
+              <div class="stat-label">Conexões Bem-sucedidas</div>
+          </div>
+          <div class="stat-card">
+              <div class="stat-number" style="color: #dc2626;">{{ stats.failed_count or 0 }}</div>
+              <div class="stat-label">Conexões Falharam</div>
+          </div>
+          <div class="stat-card">
+              <div class="stat-number">{{ "%.2f"|format(stats.avg_response_time or 0) }}s</div>
+              <div class="stat-label">Tempo Médio de Resposta</div>
+          </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="filters-section">
+          <form method="GET">
+              <div class="filters-grid">
+                  <div class="filter-group">
+                      <label class="filter-label">Empresa</label>
+                      <select name="company" class="filter-select">
+                          <option value="">Todas as empresas</option>
+                          {% for company in companies_list %}
+                              <option value="{{ company.id }}" {% if selected_company == company.id %}selected{% endif %}>
+                                  {{ company.name }}
+                              </option>
+                          {% endfor %}
+                      </select>
+                  </div>
+                  
+                  <div class="filter-group">
+                      <label class="filter-label">Ação</label>
+                      <select name="action" class="filter-select">
+                          <option value="">Todas as ações</option>
+                          <option value="test_connection" {% if selected_action == 'test_connection' %}selected{% endif %}>Teste de Conexão</option>
+                          <option value="sync_users" {% if selected_action == 'sync_users' %}selected{% endif %}>Sincronização</option>
+                      </select>
+                  </div>
+                  
+                  <div class="filter-group">
+                      <label class="filter-label">Status</label>
+                      <select name="status" class="filter-select">
+                          <option value="">Todos os status</option>
+                          <option value="success" {% if selected_status == 'success' %}selected{% endif %}>Sucesso</option>
+                          <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>Falha</option>
+                      </select>
+                  </div>
+              </div>
+              
+              <div>
+                  <button type="submit" class="btn-filter">🔍 Filtrar</button>
+                  <a href="{{ url_for('mikrotik_logs') }}" class="btn-clear">🗑️ Limpar Filtros</a>
+              </div>
+          </form>
+      </div>
+
+      <!-- Tabela de Logs -->
+      <div class="logs-table">
+          <div class="table-header">
+              <h3 class="table-title">📋 Logs de Conexão</h3>
+          </div>
+          
+          {% if logs_list %}
+              <table class="table">
+                  <thead>
+                      <tr>
+                          <th>Data/Hora</th>
+                          <th>Empresa</th>
+                          <th>Ação</th>
+                          <th>Status</th>
+                          <th>IP:Porta</th>
+                          <th>Tempo Resposta</th>
+                          <th>Mensagem</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {% for log in logs_list %}
+                          <tr>
+                              <td>{{ log.created_at }}</td>
+                              <td>{{ log.company_name }}</td>
+                              <td>
+                                  {% if log.action == 'test_connection' %}
+                                      🔗 Teste Conexão
+                                  {% elif log.action == 'sync_users' %}
+                                      🔄 Sincronização
+                                  {% else %}
+                                      {{ log.action }}
+                                  {% endif %}
+                              </td>
+                              <td>
+                                  <span class="{% if log.status == 'success' %}status-success{% else %}status-failed{% endif %}">
+                                      {% if log.status == 'success' %}
+                                          ✅ Sucesso
+                                      {% else %}
+                                          ❌ Falha
+                                      {% endif %}
+                                  </span>
+                              </td>
+                              <td>{{ log.ip_address }}:{{ log.port }}</td>
+                              <td>
+                                  {% if log.response_time %}
+                                      <span class="response-time">{{ "%.2f"|format(log.response_time) }}s</span>
+                                  {% else %}
+                                      -
+                                  {% endif %}
+                              </td>
+                              <td>{{ log.message }}</td>
+                          </tr>
+                      {% endfor %}
+                  </tbody>
+              </table>
+          {% else %}
+              <div style="text-align: center; padding: 3rem; color: #6b7280;">
+                  <p>📋 Nenhum log encontrado</p>
+                  <p>Os logs de conexão aparecerão aqui</p>
+              </div>
+          {% endif %}
+      </div>
+  </main>
+</div>
+
+<script>
+// Auto-refresh da página a cada 30 segundos
+setTimeout(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}
