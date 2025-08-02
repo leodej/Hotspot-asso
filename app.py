@@ -11,6 +11,8 @@ import socket
 import paramiko
 import time
 import re
+import threading
+from threading import Timer
 
 app = Flask(__name__)
 app.secret_key = 'mikrotik-manager-super-secret-key-2024'
@@ -22,6 +24,10 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Criar pasta de uploads se não existir
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Variável global para controlar a coleta automática
+auto_collect_running = False
+collect_timer = None
 
 # Inicializar banco de dados SQLite
 def init_db():
@@ -147,7 +153,8 @@ def init_db():
         ('enable_cumulative', '1', 'Habilitar créditos cumulativos'),
         ('system_timezone', 'America/Sao_Paulo', 'Timezone do sistema'),
         ('system_name', 'MikroTik Manager', 'Nome do sistema'),
-        ('system_logo', '', 'Logo do sistema')
+        ('system_logo', '', 'Logo do sistema'),
+        ('auto_collect_usage', '1', 'Coleta automática de uso a cada minuto')
     ]
     
     for key, value, desc in settings:
@@ -224,6 +231,244 @@ def log_mikrotik_connection(company_id, action, status, message, response_time=N
     ''', (str(uuid.uuid4()), company_id, action, status, message, response_time, ip_address, port))
     conn.commit()
     conn.close()
+
+def parse_usage_from_comment(comment):
+    """Extrai o total de uso em MB do campo comment"""
+    if not comment:
+        return 0
+    
+    try:
+        # Procurar por padrões como "1024MB", "1.5GB", "512 MB", etc.
+        # Primeiro tentar MB
+        mb_match = re.search(r'(\d+(?:\.\d+)?)\s*MB', comment, re.IGNORECASE)
+        if mb_match:
+            return int(float(mb_match.group(1)))
+        
+        # Tentar GB
+        gb_match = re.search(r'(\d+(?:\.\d+)?)\s*GB', comment, re.IGNORECASE)
+        if gb_match:
+            return int(float(gb_match.group(1)) * 1024)
+        
+        # Tentar KB
+        kb_match = re.search(r'(\d+(?:\.\d+)?)\s*KB', comment, re.IGNORECASE)
+        if kb_match:
+            return int(float(kb_match.group(1)) / 1024)
+        
+        # Tentar apenas números (assumir MB)
+        num_match = re.search(r'(\d+(?:\.\d+)?)', comment)
+        if num_match:
+            return int(float(num_match.group(1)))
+            
+    except (ValueError, AttributeError):
+        pass
+    
+    return 0
+
+def collect_user_usage_from_mikrotik(company_id):
+    """Coleta o uso dos usuários do MikroTik via comment"""
+    conn = get_db()
+    company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
+    
+    if not company:
+        conn.close()
+        return False, 'Empresa não encontrada'
+    
+    start_time = time.time()
+    
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        ssh.connect(
+            hostname=company['mikrotik_ip'],
+            port=int(company['mikrotik_port']),
+            username=company['mikrotik_user'],
+            password=company['mikrotik_password'],
+            timeout=10
+        )
+        
+        # Executar comando para listar usuários hotspot com detalhes
+        stdin, stdout, stderr = ssh.exec_command('/ip hotspot user print detail')
+        output = stdout.read().decode('utf-8')
+        error = stderr.read().decode('utf-8')
+        
+        ssh.close()
+        
+        if error:
+            response_time = time.time() - start_time
+            log_mikrotik_connection(
+                company_id, 'collect_usage', 'failed', 
+                f'Erro ao coletar uso: {error}', 
+                response_time, company['mikrotik_ip'], company['mikrotik_port']
+            )
+            conn.close()
+            return False, f'Erro ao coletar uso: {error}'
+        
+        # Fazer parsing da saída para extrair usage dos comments
+        users_usage = parse_mikrotik_users_usage(output)
+        
+        updated_count = 0
+        
+        for user_data in users_usage:
+            username = user_data.get('name', '')
+            comment = user_data.get('comment', '')
+            used_mb = parse_usage_from_comment(comment)
+            
+            if not username:
+                continue
+            
+            # Buscar usuário no sistema
+            user = conn.execute('''
+                SELECT hu.id, uc.id as credit_id, uc.total_mb 
+                FROM hotspot_users hu
+                LEFT JOIN user_credits uc ON hu.id = uc.hotspot_user_id
+                WHERE hu.username = ? AND hu.company_id = ?
+            ''', (username, company_id)).fetchone()
+            
+            if user:
+                # Calcular remaining_mb
+                remaining_mb = max(0, user['total_mb'] - used_mb)
+                
+                # Atualizar créditos do usuário
+                if user['credit_id']:
+                    conn.execute('''
+                        UPDATE user_credits 
+                        SET used_mb = ?, remaining_mb = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ''', (used_mb, remaining_mb, user['credit_id']))
+                else:
+                    # Criar registro de crédito se não existir
+                    default_credit = int(get_setting('default_credit_mb', 1024))
+                    remaining_mb = max(0, default_credit - used_mb)
+                    conn.execute('''
+                        INSERT INTO user_credits (id, hotspot_user_id, total_mb, used_mb, remaining_mb, last_reset)
+                        VALUES (?, ?, ?, ?, ?, DATE('now'))
+                    ''', (str(uuid.uuid4()), user['id'], default_credit, used_mb, remaining_mb))
+                
+                updated_count += 1
+        
+        conn.commit()
+        conn.close()
+        
+        response_time = time.time() - start_time
+        message = f'Coletado uso de {updated_count} usuários'
+        
+        log_mikrotik_connection(
+            company_id, 'collect_usage', 'success', 
+            message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        return True, message
+        
+    except Exception as e:
+        response_time = time.time() - start_time
+        error_message = f'Erro na coleta de uso: {str(e)}'
+        
+        log_mikrotik_connection(
+            company_id, 'collect_usage', 'failed', 
+            error_message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        conn.close()
+        return False, error_message
+
+def parse_mikrotik_users_usage(output):
+    """Faz parsing da saída do comando /ip hotspot user print detail para extrair usage"""
+    users = []
+    current_user = {}
+    
+    lines = output.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        
+        # Nova entrada de usuário (começa com número)
+        if re.match(r'^\d+', line):
+            if current_user:
+                users.append(current_user)
+            current_user = {}
+            continue
+        
+        # Parsing dos campos usando regex para extrair valores corretos
+        if 'name=' in line:
+            # Extrair nome: name="valor" ou name=valor
+            name_match = re.search(r'name=(?:"([^"]+)"|([^\s]+))', line)
+            if name_match:
+                current_user['name'] = name_match.group(1) or name_match.group(2)
+        
+        if 'comment=' in line:
+            # Extrair comment: comment="valor" ou comment=valor
+            comment_match = re.search(r'comment=(?:"([^"]+)"|([^\s]+))', line)
+            if comment_match:
+                current_user['comment'] = comment_match.group(1) or comment_match.group(2)
+    
+    # Adicionar último usuário
+    if current_user:
+        users.append(current_user)
+    
+    return users
+
+def collect_all_companies_usage():
+    """Coleta uso de todas as empresas ativas"""
+    conn = get_db()
+    companies = conn.execute('SELECT id FROM companies WHERE active = 1').fetchall()
+    conn.close()
+    
+    total_updated = 0
+    for company in companies:
+        try:
+            success, message = collect_user_usage_from_mikrotik(company['id'])
+            if success:
+                # Extrair número de usuários atualizados da mensagem
+                match = re.search(r'(\d+)', message)
+                if match:
+                    total_updated += int(match.group(1))
+        except Exception as e:
+            print(f"Erro ao coletar uso da empresa {company['id']}: {e}")
+    
+    return total_updated
+
+def auto_collect_usage():
+    """Função para coleta automática de uso"""
+    global collect_timer, auto_collect_running
+    
+    if not auto_collect_running:
+        return
+    
+    try:
+        # Verificar se a coleta automática está habilitada
+        auto_collect_enabled = get_setting('auto_collect_usage', '1') == '1'
+        
+        if auto_collect_enabled:
+            total_updated = collect_all_companies_usage()
+            print(f"Coleta automática: {total_updated} usuários atualizados - {datetime.now()}")
+    except Exception as e:
+        print(f"Erro na coleta automática: {e}")
+    
+    # Agendar próxima coleta em 1 minuto
+    if auto_collect_running:
+        collect_timer = Timer(60.0, auto_collect_usage)
+        collect_timer.start()
+
+def start_auto_collect():
+    """Inicia a coleta automática"""
+    global auto_collect_running, collect_timer
+    
+    if not auto_collect_running:
+        auto_collect_running = True
+        collect_timer = Timer(60.0, auto_collect_usage)
+        collect_timer.start()
+        print("Coleta automática de uso iniciada (a cada 1 minuto)")
+
+def stop_auto_collect():
+    """Para a coleta automática"""
+    global auto_collect_running, collect_timer
+    
+    auto_collect_running = False
+    if collect_timer:
+        collect_timer.cancel()
+        collect_timer = None
+        print("Coleta automática de uso parada")
 
 def test_mikrotik_connection(company_id, ip_address, port, username, password):
     """Testa conexão com MikroTik via SSH"""
@@ -963,6 +1208,39 @@ def import_company_users(company_id):
     
     return redirect(url_for('companies'))
 
+@app.route('/companies/<company_id>/collect-usage', methods=['POST'])
+@require_auth
+def collect_company_usage(company_id):
+    """Coletar uso dos usuários de uma empresa"""
+    conn = get_db()
+    company = conn.execute('SELECT name FROM companies WHERE id = ?', (company_id,)).fetchone()
+    conn.close()
+    
+    if not company:
+        flash('Empresa não encontrada', 'error')
+        return redirect(url_for('companies'))
+    
+    success, message = collect_user_usage_from_mikrotik(company_id)
+    
+    if success:
+        flash(f'Coleta de uso de {company["name"]}: {message}', 'success')
+    else:
+        flash(f'Falha na coleta de uso de {company["name"]}: {message}', 'error')
+    
+    return redirect(url_for('companies'))
+
+@app.route('/collect-all-usage', methods=['POST'])
+@require_auth
+def collect_all_usage():
+    """Coletar uso de todas as empresas"""
+    try:
+        total_updated = collect_all_companies_usage()
+        flash(f'Coleta de uso concluída: {total_updated} usuários atualizados', 'success')
+    except Exception as e:
+        flash(f'Erro na coleta de uso: {str(e)}', 'error')
+    
+    return redirect(request.referrer or url_for('dashboard'))
+
 @app.route('/companies/update-turma', methods=['POST'])
 @require_auth
 def update_company_turma():
@@ -1502,7 +1780,8 @@ def settings():
             ('credit_reset_time', request.form.get('credit_reset_time')),
             ('enable_cumulative', '1' if request.form.get('enable_cumulative') else '0'),
             ('system_timezone', request.form.get('system_timezone')),
-            ('system_name', request.form.get('system_name'))
+            ('system_name', request.form.get('system_name')),
+            ('auto_collect_usage', '1' if request.form.get('auto_collect_usage') else '0')
         ]
         
         for key, value in settings_to_update:
@@ -1557,9 +1836,19 @@ def api_update_credits():
 
 if __name__ == '__main__':
     init_db()
+    
+    # Iniciar coleta automática se habilitada
+    auto_collect_enabled = get_setting('auto_collect_usage', '1') == '1'
+    if auto_collect_enabled:
+        start_auto_collect()
+    
     print("🚀 Iniciando MikroTik Manager Flask...")
     print("📧 Login: admin@demo.com")
     print("🔑 Senha: admin123")
     print("🌐 URL: http://localhost:5000")
     print("💾 Banco: mikrotik_manager.db")
+    if auto_collect_enabled:
+        print("🔄 Coleta automática de uso: ATIVADA (a cada 1 minuto)")
+    else:
+        print("🔄 Coleta automática de uso: DESATIVADA")
     app.run(host='0.0.0.0', port=5000, debug=True)
