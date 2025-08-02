@@ -1,16 +1,26 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_from_directory
 import os
 import json
 from datetime import datetime, timedelta
 import hashlib
 import sqlite3
 import uuid
+from werkzeug.utils import secure_filename
+from PIL import Image
+import socket
+import paramiko
+import time
 
 app = Flask(__name__)
 app.secret_key = 'mikrotik-manager-super-secret-key-2024'
 
 # Configurações
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Criar pasta de uploads se não existir
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Inicializar banco de dados SQLite
 def init_db():
@@ -41,6 +51,8 @@ def init_db():
             mikrotik_password TEXT NOT NULL,
             turma_ativa TEXT DEFAULT 'A',
             active INTEGER DEFAULT 1,
+            connection_status TEXT DEFAULT 'disconnected',
+            last_connection_test TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -105,6 +117,22 @@ def init_db():
         )
     ''')
     
+    # Tabela de logs de conexão MikroTik
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mikrotik_connection_logs (
+            id TEXT PRIMARY KEY,
+            company_id TEXT,
+            action TEXT NOT NULL,
+            status TEXT NOT NULL,
+            message TEXT,
+            response_time REAL,
+            ip_address TEXT,
+            port INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES companies (id)
+        )
+    ''')
+    
     # Inserir usuário admin padrão
     cursor.execute('''
         INSERT OR IGNORE INTO system_users (id, email, password, name, role)
@@ -116,7 +144,9 @@ def init_db():
         ('default_credit_mb', '1024', 'Crédito padrão em MB para novos usuários'),
         ('credit_reset_time', '00:00', 'Horário de reset dos créditos diários'),
         ('enable_cumulative', '1', 'Habilitar créditos cumulativos'),
-        ('system_timezone', 'America/Sao_Paulo', 'Timezone do sistema')
+        ('system_timezone', 'America/Sao_Paulo', 'Timezone do sistema'),
+        ('system_name', 'MikroTik Manager', 'Nome do sistema'),
+        ('system_logo', '', 'Logo do sistema')
     ]
     
     for key, value, desc in settings:
@@ -152,6 +182,219 @@ def get_setting(key, default=None):
     setting = conn.execute('SELECT value FROM system_settings WHERE key = ?', (key,)).fetchone()
     conn.close()
     return setting['value'] if setting else default
+
+def allowed_file(filename):
+    """Verifica se o arquivo é permitido"""
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'svg'}
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def resize_image(image_path, size=(64, 64)):
+    """Redimensiona imagem mantendo proporção"""
+    try:
+        with Image.open(image_path) as img:
+            # Converter para RGB se necessário
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+            
+            # Redimensionar mantendo proporção
+            img.thumbnail(size, Image.Resampling.LANCZOS)
+            
+            # Criar nova imagem com fundo branco
+            new_img = Image.new('RGB', size, (255, 255, 255))
+            
+            # Centralizar a imagem redimensionada
+            x = (size[0] - img.width) // 2
+            y = (size[1] - img.height) // 2
+            new_img.paste(img, (x, y))
+            
+            # Salvar
+            new_img.save(image_path, 'PNG', quality=95)
+            return True
+    except Exception as e:
+        print(f"Erro ao redimensionar imagem: {e}")
+        return False
+
+def log_mikrotik_connection(company_id, action, status, message, response_time=None, ip_address=None, port=None):
+    """Registra log de conexão com MikroTik"""
+    conn = get_db()
+    conn.execute('''
+        INSERT INTO mikrotik_connection_logs (id, company_id, action, status, message, response_time, ip_address, port)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (str(uuid.uuid4()), company_id, action, status, message, response_time, ip_address, port))
+    conn.commit()
+    conn.close()
+
+def test_mikrotik_connection(company_id, ip_address, port, username, password):
+    """Testa conexão com MikroTik via SSH"""
+    start_time = time.time()
+    
+    try:
+        # Testar conexão TCP primeiro
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(10)
+        result = sock.connect_ex((ip_address, int(port)))
+        sock.close()
+        
+        if result != 0:
+            response_time = time.time() - start_time
+            log_mikrotik_connection(
+                company_id, 'test_connection', 'failed', 
+                f'Porta {port} não está acessível', 
+                response_time, ip_address, port
+            )
+            return False, f'Porta {port} não está acessível'
+        
+        # Testar conexão SSH
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        ssh.connect(
+            hostname=ip_address,
+            port=int(port),
+            username=username,
+            password=password,
+            timeout=10
+        )
+        
+        # Executar comando simples para verificar se está funcionando
+        stdin, stdout, stderr = ssh.exec_command('/system identity print')
+        output = stdout.read().decode('utf-8')
+        error = stderr.read().decode('utf-8')
+        
+        ssh.close()
+        
+        response_time = time.time() - start_time
+        
+        if error:
+            log_mikrotik_connection(
+                company_id, 'test_connection', 'failed', 
+                f'Erro na execução do comando: {error}', 
+                response_time, ip_address, port
+            )
+            return False, f'Erro na execução do comando: {error}'
+        
+        log_mikrotik_connection(
+            company_id, 'test_connection', 'success', 
+            'Conexão estabelecida com sucesso', 
+            response_time, ip_address, port
+        )
+        
+        # Atualizar status da empresa
+        conn = get_db()
+        conn.execute('''
+            UPDATE companies 
+            SET connection_status = 'connected', last_connection_test = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (company_id,))
+        conn.commit()
+        conn.close()
+        
+        return True, 'Conexão estabelecida com sucesso'
+        
+    except paramiko.AuthenticationException:
+        response_time = time.time() - start_time
+        log_mikrotik_connection(
+            company_id, 'test_connection', 'failed', 
+            'Falha na autenticação - usuário ou senha incorretos', 
+            response_time, ip_address, port
+        )
+        return False, 'Falha na autenticação - usuário ou senha incorretos'
+        
+    except paramiko.SSHException as e:
+        response_time = time.time() - start_time
+        log_mikrotik_connection(
+            company_id, 'test_connection', 'failed', 
+            f'Erro SSH: {str(e)}', 
+            response_time, ip_address, port
+        )
+        return False, f'Erro SSH: {str(e)}'
+        
+    except socket.timeout:
+        response_time = time.time() - start_time
+        log_mikrotik_connection(
+            company_id, 'test_connection', 'failed', 
+            'Timeout na conexão', 
+            response_time, ip_address, port
+        )
+        return False, 'Timeout na conexão'
+        
+    except Exception as e:
+        response_time = time.time() - start_time
+        log_mikrotik_connection(
+            company_id, 'test_connection', 'failed', 
+            f'Erro inesperado: {str(e)}', 
+            response_time, ip_address, port
+        )
+        return False, f'Erro inesperado: {str(e)}'
+
+def sync_hotspot_users_to_mikrotik(company_id):
+    """Sincroniza usuários hotspot com o MikroTik"""
+    conn = get_db()
+    
+    # Buscar dados da empresa
+    company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
+    if not company:
+        return False, 'Empresa não encontrada'
+    
+    # Buscar usuários ativos da turma ativa
+    users = conn.execute('''
+        SELECT * FROM hotspot_users 
+        WHERE company_id = ? AND active = 1 AND turma = ?
+    ''', (company_id, company['turma_ativa'])).fetchall()
+    
+    conn.close()
+    
+    start_time = time.time()
+    
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        ssh.connect(
+            hostname=company['mikrotik_ip'],
+            port=int(company['mikrotik_port']),
+            username=company['mikrotik_user'],
+            password=company['mikrotik_password'],
+            timeout=10
+        )
+        
+        synced_users = 0
+        
+        for user in users:
+            try:
+                # Comando para adicionar/atualizar usuário no hotspot
+                command = f'/ip hotspot user add name="{user["username"]}" password="{user["password"]}" profile="default"'
+                stdin, stdout, stderr = ssh.exec_command(command)
+                
+                error = stderr.read().decode('utf-8')
+                if not error or 'already exists' in error:
+                    synced_users += 1
+                    
+            except Exception as e:
+                print(f"Erro ao sincronizar usuário {user['username']}: {e}")
+        
+        ssh.close()
+        
+        response_time = time.time() - start_time
+        message = f'Sincronizados {synced_users} usuários com sucesso'
+        
+        log_mikrotik_connection(
+            company_id, 'sync_users', 'success', 
+            message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        return True, message
+        
+    except Exception as e:
+        response_time = time.time() - start_time
+        error_message = f'Erro na sincronização: {str(e)}'
+        
+        log_mikrotik_connection(
+            company_id, 'sync_users', 'failed', 
+            error_message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        return False, error_message
 
 def update_credits_cumulative():
     """Atualiza créditos cumulativos diariamente"""
@@ -337,7 +580,7 @@ def companies():
     if request.method == 'POST':
         name = request.form.get('name')
         mikrotik_ip = request.form.get('mikrotik_ip')
-        mikrotik_port = request.form.get('mikrotik_port', 8728)
+        mikrotik_port = request.form.get('mikrotik_port', 22)
         mikrotik_user = request.form.get('mikrotik_user')
         mikrotik_password = request.form.get('mikrotik_password')
         turma_ativa = request.form.get('turma_ativa', 'A')
@@ -346,13 +589,21 @@ def companies():
             flash('Todos os campos são obrigatórios', 'error')
         else:
             conn = get_db()
+            company_id = str(uuid.uuid4())
             conn.execute('''
                 INSERT INTO companies (id, name, mikrotik_ip, mikrotik_port, mikrotik_user, mikrotik_password, turma_ativa)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (str(uuid.uuid4()), name, mikrotik_ip, int(mikrotik_port), mikrotik_user, mikrotik_password, turma_ativa))
+            ''', (company_id, name, mikrotik_ip, int(mikrotik_port), mikrotik_user, mikrotik_password, turma_ativa))
             conn.commit()
             conn.close()
-            flash('Empresa cadastrada com sucesso!', 'success')
+            
+            # Testar conexão automaticamente
+            success, message = test_mikrotik_connection(company_id, mikrotik_ip, mikrotik_port, mikrotik_user, mikrotik_password)
+            
+            if success:
+                flash(f'Empresa cadastrada e conexão testada com sucesso!', 'success')
+            else:
+                flash(f'Empresa cadastrada, mas falha na conexão: {message}', 'warning')
         
         return redirect(url_for('companies'))
     
@@ -368,6 +619,54 @@ def companies():
     conn.close()
     
     return render_template('companies.html', user={'name': session.get('name')}, companies_list=companies_list)
+
+@app.route('/companies/<company_id>/test-connection', methods=['POST'])
+@require_auth
+def test_company_connection(company_id):
+    """Testar conexão com MikroTik de uma empresa"""
+    conn = get_db()
+    company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
+    conn.close()
+    
+    if not company:
+        flash('Empresa não encontrada', 'error')
+        return redirect(url_for('companies'))
+    
+    success, message = test_mikrotik_connection(
+        company_id, 
+        company['mikrotik_ip'], 
+        company['mikrotik_port'], 
+        company['mikrotik_user'], 
+        company['mikrotik_password']
+    )
+    
+    if success:
+        flash(f'Conexão com {company["name"]}: {message}', 'success')
+    else:
+        flash(f'Falha na conexão com {company["name"]}: {message}', 'error')
+    
+    return redirect(url_for('companies'))
+
+@app.route('/companies/<company_id>/sync-users', methods=['POST'])
+@require_auth
+def sync_company_users(company_id):
+    """Sincronizar usuários com MikroTik"""
+    conn = get_db()
+    company = conn.execute('SELECT name FROM companies WHERE id = ?', (company_id,)).fetchone()
+    conn.close()
+    
+    if not company:
+        flash('Empresa não encontrada', 'error')
+        return redirect(url_for('companies'))
+    
+    success, message = sync_hotspot_users_to_mikrotik(company_id)
+    
+    if success:
+        flash(f'Sincronização com {company["name"]}: {message}', 'success')
+    else:
+        flash(f'Falha na sincronização com {company["name"]}: {message}', 'error')
+    
+    return redirect(url_for('companies'))
 
 @app.route('/companies/update-turma', methods=['POST'])
 @require_auth
@@ -391,9 +690,76 @@ def update_company_turma():
         # Atualizar status dos usuários baseado na nova turma ativa
         update_users_by_turma(company_id, turma_ativa)
         
-        flash(f'Turma ativa atualizada para {turma_ativa}!', 'success')
+        # Sincronizar automaticamente com MikroTik
+        sync_hotspot_users_to_mikrotik(company_id)
+        
+        flash(f'Turma ativa atualizada para {turma_ativa} e sincronizada!', 'success')
     
     return redirect(url_for('companies'))
+
+@app.route('/mikrotik-logs')
+@require_auth
+def mikrotik_logs():
+    """Página de logs de conexão MikroTik"""
+    # Obter filtros da URL
+    company_filter = request.args.get('company', '')
+    action_filter = request.args.get('action', '')
+    status_filter = request.args.get('status', '')
+    
+    conn = get_db()
+    
+    # Construir query base
+    base_query = '''
+        SELECT ml.*, c.name as company_name
+        FROM mikrotik_connection_logs ml
+        JOIN companies c ON ml.company_id = c.id
+        WHERE 1=1
+    '''
+    
+    params = []
+    
+    # Aplicar filtros
+    if company_filter:
+        base_query += ' AND c.id = ?'
+        params.append(company_filter)
+    
+    if action_filter:
+        base_query += ' AND ml.action = ?'
+        params.append(action_filter)
+    
+    if status_filter:
+        base_query += ' AND ml.status = ?'
+        params.append(status_filter)
+    
+    base_query += ' ORDER BY ml.created_at DESC LIMIT 500'
+    
+    # Buscar logs
+    logs_list = conn.execute(base_query, params).fetchall()
+    
+    # Buscar empresas para o filtro
+    companies_list = conn.execute('SELECT * FROM companies WHERE active = 1 ORDER BY name').fetchall()
+    
+    # Estatísticas dos logs
+    stats = conn.execute('''
+        SELECT 
+            COUNT(*) as total_logs,
+            COUNT(CASE WHEN status = 'success' THEN 1 END) as success_count,
+            COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_count,
+            AVG(response_time) as avg_response_time
+        FROM mikrotik_connection_logs
+        WHERE created_at >= datetime('now', '-24 hours')
+    ''').fetchone()
+    
+    conn.close()
+    
+    return render_template('mikrotik_logs.html', 
+                         user={'name': session.get('name')},
+                         logs_list=logs_list,
+                         companies_list=companies_list,
+                         stats=stats,
+                         selected_company=company_filter,
+                         selected_action=action_filter,
+                         selected_status=status_filter)
 
 @app.route('/profiles', methods=['GET', 'POST'])
 @require_auth
@@ -475,6 +841,12 @@ def hotspot_users():
                 ''', (str(uuid.uuid4()), user_id, default_credit, default_credit))
                 
                 conn.commit()
+                conn.close()
+                
+                # Sincronizar com MikroTik se usuário estiver ativo
+                if user_active:
+                    sync_hotspot_users_to_mikrotik(company_id)
+                
                 flash('Usuário hotspot criado com sucesso!', 'success')
             except sqlite3.IntegrityError:
                 flash('Username já existe', 'error')
@@ -543,6 +915,11 @@ def edit_hotspot_user():
                 ''', (company_id, profile_id, username, full_name, email, phone, turma, user_active, user_id))
             
             conn.commit()
+            conn.close()
+            
+            # Sincronizar com MikroTik
+            sync_hotspot_users_to_mikrotik(company_id)
+            
             flash('Usuário hotspot atualizado com sucesso!', 'success')
         except sqlite3.IntegrityError:
             flash('Username já existe', 'error')
@@ -786,12 +1163,40 @@ def settings():
     if request.method == 'POST':
         conn = get_db()
         
-        # Atualizar configurações
+        # Verificar se é upload de logo
+        if 'logo' in request.files:
+            file = request.files['logo']
+            if file and file.filename and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                # Gerar nome único para o arquivo
+                unique_filename = f"logo_{uuid.uuid4().hex[:8]}.png"
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                
+                try:
+                    file.save(file_path)
+                    
+                    # Redimensionar imagem
+                    if resize_image(file_path):
+                        # Atualizar configuração do logo
+                        conn.execute('''
+                            UPDATE system_settings 
+                            SET value = ? 
+                            WHERE key = 'system_logo'
+                        ''', (unique_filename,))
+                        flash('Logo atualizado com sucesso!', 'success')
+                    else:
+                        os.remove(file_path)
+                        flash('Erro ao processar imagem', 'error')
+                except Exception as e:
+                    flash(f'Erro ao salvar logo: {str(e)}', 'error')
+        
+        # Atualizar outras configurações
         settings_to_update = [
             ('default_credit_mb', request.form.get('default_credit_mb')),
             ('credit_reset_time', request.form.get('credit_reset_time')),
             ('enable_cumulative', '1' if request.form.get('enable_cumulative') else '0'),
-            ('system_timezone', request.form.get('system_timezone'))
+            ('system_timezone', request.form.get('system_timezone')),
+            ('system_name', request.form.get('system_name'))
         ]
         
         for key, value in settings_to_update:
@@ -818,6 +1223,11 @@ def settings():
     return render_template('settings.html', 
                          user={'name': session.get('name')},
                          settings=current_settings)
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    """Servir arquivos de upload"""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # API Routes
 @app.route('/api/health')

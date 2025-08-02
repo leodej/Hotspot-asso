@@ -37,6 +37,9 @@
                     <a href="{{ url_for('reports') }}" class="nav-link">Relatórios</a>
                 </li>
                 <li class="nav-item">
+                    <a href="{{ url_for('mikrotik_logs') }}" class="nav-link">Logs MikroTik</a>
+                </li>
+                <li class="nav-item">
                     <a href="{{ url_for('settings') }}" class="nav-link">Configurações</a>
                 </li>
             </ul>
@@ -47,7 +50,7 @@
         <div class="header">
             <div>
                 <h1>Gerenciamento de Empresas</h1>
-                <p>Gerencie empresas e suas configurações MikroTik</p>
+                <p>Configure e monitore conexões com roteadores MikroTik</p>
             </div>
             <div class="user-info">
                 <span class="user-name">{{ user.name }}</span>
@@ -56,165 +59,51 @@
         </div>
 
         <style>
-            .action-bar {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 1.5rem;
+            .form-section {
                 background: white;
-                padding: 1rem;
+                padding: 2rem;
                 border-radius: 8px;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            }
-
-            .companies-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-                gap: 1.5rem;
                 margin-bottom: 2rem;
             }
 
-            .company-card {
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                padding: 1.5rem;
-                transition: transform 0.2s;
-            }
-
-            .company-card:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            }
-
-            .company-name {
+            .form-title {
                 font-size: 1.25rem;
                 font-weight: 600;
                 color: #1f2937;
-                margin-bottom: 1rem;
+                margin-bottom: 1.5rem;
             }
 
-            .company-info {
-                margin-bottom: 1rem;
-            }
-
-            .info-item {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 0.5rem;
-                font-size: 0.875rem;
-            }
-
-            .info-label {
-                color: #6b7280;
-            }
-
-            .info-value {
-                color: #1f2937;
-                font-weight: 500;
-            }
-
-            .company-actions {
-                display: flex;
-                gap: 0.5rem;
-                margin-top: 1rem;
-            }
-
-            .btn-action {
-                padding: 0.5rem;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 0.875rem;
-                display: flex;
-                align-items: center;
-                gap: 0.25rem;
-            }
-
-            .btn-test {
-                background: #3b82f6;
-                color: white;
-            }
-
-            .btn-edit {
-                background: #10b981;
-                color: white;
-            }
-
-            .btn-delete {
-                background: #ef4444;
-                color: white;
-            }
-
-            .btn-action:hover {
-                opacity: 0.8;
-            }
-
-            .add-company-card {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                cursor: pointer;
-                transition: transform 0.2s;
-            }
-
-            .add-company-card:hover {
-                transform: translateY(-2px);
-            }
-
-            .add-icon {
-                font-size: 3rem;
-                margin-bottom: 1rem;
-                opacity: 0.8;
-            }
-
-            .modal {
-                display: none;
-                position: fixed;
-                z-index: 1000;
-                left: 0;
-                top: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(0,0,0,0.5);
-            }
-
-            .modal-content {
-                background-color: white;
-                margin: 5% auto;
-                padding: 2rem;
-                border-radius: 8px;
-                width: 90%;
-                max-width: 500px;
+            .form-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 1rem;
+                margin-bottom: 1.5rem;
             }
 
             .form-group {
-                margin-bottom: 1rem;
+                display: flex;
+                flex-direction: column;
             }
 
             .form-label {
-                display: block;
-                margin-bottom: 0.5rem;
+                font-size: 0.875rem;
                 font-weight: 500;
+                color: #374151;
+                margin-bottom: 0.5rem;
             }
 
             .form-input, .form-select {
-                width: 100%;
                 padding: 0.75rem;
                 border: 1px solid #d1d5db;
                 border-radius: 6px;
                 font-size: 0.875rem;
             }
 
-            .form-actions {
-                display: flex;
-                gap: 1rem;
-                justify-content: flex-end;
-                margin-top: 1.5rem;
+            .form-input:focus, .form-select:focus {
+                outline: none;
+                border-color: #3b82f6;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
             }
 
             .btn-primary {
@@ -223,25 +112,64 @@
                 border: none;
                 padding: 0.75rem 1.5rem;
                 border-radius: 6px;
+                font-size: 0.875rem;
+                font-weight: 500;
                 cursor: pointer;
+                transition: background-color 0.2s;
             }
 
-            .btn-secondary {
-                background: #6b7280;
-                color: white;
-                border: none;
+            .btn-primary:hover {
+                background: #2563eb;
+            }
+
+            .companies-table {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+
+            .table-header {
+                background: #f9fafb;
+                padding: 1rem 1.5rem;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            .table-title {
+                font-size: 1.125rem;
+                font-weight: 600;
+                color: #1f2937;
+            }
+
+            .table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            .table th,
+            .table td {
                 padding: 0.75rem 1.5rem;
-                border-radius: 6px;
-                cursor: pointer;
+                text-align: left;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            .table th {
+                background: #f9fafb;
+                font-weight: 600;
+                color: #374151;
+                font-size: 0.875rem;
+            }
+
+            .table td {
+                font-size: 0.875rem;
+                color: #1f2937;
             }
 
             .status-badge {
-                padding: 0.25rem 0.5rem;
-                border-radius: 4px;
+                padding: 0.25rem 0.75rem;
+                border-radius: 9999px;
                 font-size: 0.75rem;
                 font-weight: 500;
-                margin-top: 0.5rem;
-                display: inline-block;
             }
 
             .status-connected {
@@ -254,211 +182,160 @@
                 color: #991b1b;
             }
 
-            .status-testing {
-                background: #fef3c7;
-                color: #92400e;
-            }
-
-            .turma-control {
-                margin-top: 1rem;
-                padding: 1rem;
-                background: #f9fafb;
-                border-radius: 6px;
-                border: 1px solid #e5e7eb;
-            }
-
-            .turma-label {
-                font-size: 0.875rem;
-                font-weight: 500;
-                color: #374151;
-                margin-bottom: 0.5rem;
-            }
-
             .turma-select {
-                width: 100%;
-                padding: 0.5rem;
+                padding: 0.25rem 0.5rem;
                 border: 1px solid #d1d5db;
                 border-radius: 4px;
-                font-size: 0.875rem;
-                margin-bottom: 0.5rem;
+                font-size: 0.75rem;
+                margin-right: 0.5rem;
             }
 
-            .turma-btn {
+            .btn-small {
+                padding: 0.25rem 0.75rem;
+                font-size: 0.75rem;
+                border-radius: 4px;
+                border: none;
+                cursor: pointer;
+                margin: 0 0.25rem;
+            }
+
+            .btn-test {
+                background: #10b981;
+                color: white;
+            }
+
+            .btn-sync {
                 background: #f59e0b;
                 color: white;
-                border: none;
-                padding: 0.5rem 1rem;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 0.875rem;
-                width: 100%;
             }
 
-            .turma-btn:hover {
-                background: #d97706;
+            .btn-update {
+                background: #3b82f6;
+                color: white;
+            }
+
+            .btn-small:hover {
+                opacity: 0.8;
+            }
+
+            .actions-cell {
+                white-space: nowrap;
             }
         </style>
 
-        <div class="action-bar">
-            <h2>Lista de Empresas</h2>
-            <button class="btn-primary" onclick="openModal()">+ Nova Empresa</button>
-        </div>
-
-        <div class="companies-grid">
-            {% for company in companies_list %}
-            <div class="company-card">
-                <div class="company-name">{{ company.name }}</div>
-                <div class="company-info">
-                    <div class="info-item">
-                        <span class="info-label">IP do Roteador:</span>
-                        <span class="info-value">{{ company.mikrotik_ip }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Porta:</span>
-                        <span class="info-value">{{ company.mikrotik_port }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Usuários Ativos:</span>
-                        <span class="info-value">{{ company.user_count or 0 }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Turma Ativa:</span>
-                        <span class="info-value">Turma {{ company.turma_ativa }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Criado em:</span>
-                        <span class="info-value">{{ company.created_at }}</span>
-                    </div>
-                </div>
-                
-                <div class="turma-control">
-                    <div class="turma-label">Controle de Turma:</div>
-                    <form method="POST" action="/companies/update-turma" style="margin: 0;">
-                        <input type="hidden" name="company_id" value="{{ company.id }}">
-                        <select name="turma_ativa" class="turma-select">
-                            <option value="A" {% if company.turma_ativa == 'A' %}selected{% endif %}>Turma A</option>
-                            <option value="B" {% if company.turma_ativa == 'B' %}selected{% endif %}>Turma B</option>
-                        </select>
-                        <button type="submit" class="turma-btn">Alterar Turma Ativa</button>
-                    </form>
-                </div>
-                
-                <span id="status-{{ company.id }}" class="status-badge status-disconnected">Desconectado</span>
-                <div class="company-actions">
-                    <button class="btn-action btn-test" onclick="testConnection('{{ company.id }}')" title="Testar Conexão">
-                        🔌 Testar
-                    </button>
-                    <button class="btn-action btn-edit" onclick="editCompany('{{ company.id }}')" title="Editar">
-                        ✏️ Editar
-                    </button>
-                    <button class="btn-action btn-delete" onclick="deleteCompany('{{ company.id }}')" title="Excluir">
-                        🗑️ Excluir
-                    </button>
-                </div>
-            </div>
-            {% else %}
-            <div class="company-card add-company-card" onclick="openModal()">
-                <div class="add-icon">+</div>
-                <h3>Adicionar Nova Empresa</h3>
-                <p>Clique para cadastrar uma nova empresa</p>
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- Modal de Cadastro/Edição -->
-        <div id="companyModal" class="modal">
-            <div class="modal-content">
-                <h3 id="modalTitle">Cadastrar Nova Empresa</h3>
-                <form id="companyForm" method="POST">
-                    <input type="hidden" id="companyId" name="id">
+        <!-- Formulário de Nova Empresa -->
+        <div class="form-section">
+            <h2 class="form-title">➕ Adicionar Nova Empresa</h2>
+            <form method="POST">
+                <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label">Nome da Empresa</label>
-                        <input type="text" id="companyName" name="name" class="form-input" required>
+                        <input type="text" name="name" class="form-input" required placeholder="Ex: Empresa ABC">
                     </div>
+                    
                     <div class="form-group">
                         <label class="form-label">IP do MikroTik</label>
-                        <input type="text" id="companyIp" name="mikrotik_ip" class="form-input" placeholder="192.168.1.1" required>
+                        <input type="text" name="mikrotik_ip" class="form-input" required placeholder="192.168.1.1">
                     </div>
+                    
                     <div class="form-group">
-                        <label class="form-label">Porta</label>
-                        <input type="number" id="companyPort" name="mikrotik_port" class="form-input" value="8728" required>
+                        <label class="form-label">Porta SSH</label>
+                        <input type="number" name="mikrotik_port" class="form-input" value="22" placeholder="22">
                     </div>
+                    
                     <div class="form-group">
                         <label class="form-label">Usuário MikroTik</label>
-                        <input type="text" id="companyUser" name="mikrotik_user" class="form-input" required>
+                        <input type="text" name="mikrotik_user" class="form-input" required placeholder="admin">
                     </div>
+                    
                     <div class="form-group">
                         <label class="form-label">Senha MikroTik</label>
-                        <input type="password" id="companyPassword" name="mikrotik_password" class="form-input" required>
+                        <input type="password" name="mikrotik_password" class="form-input" required>
                     </div>
+                    
                     <div class="form-group">
                         <label class="form-label">Turma Ativa</label>
-                        <select name="turma_ativa" id="companyTurma" class="form-select" required>
+                        <select name="turma_ativa" class="form-select">
                             <option value="A">Turma A</option>
                             <option value="B">Turma B</option>
                         </select>
                     </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
-                        <button type="submit" class="btn-primary">Salvar</button>
-                    </div>
-                </form>
-            </div>
+                </div>
+                
+                <button type="submit" class="btn-primary">💾 Cadastrar Empresa</button>
+            </form>
         </div>
 
-        <script>
-            function openModal() {
-                document.getElementById('companyModal').style.display = 'block';
-                document.getElementById('modalTitle').textContent = 'Cadastrar Nova Empresa';
-                document.getElementById('companyForm').reset();
-                document.getElementById('companyId').value = '';
-            }
-
-            function closeModal() {
-                document.getElementById('companyModal').style.display = 'none';
-            }
-
-            function editCompany(id) {
-                // Aqui você pode fazer uma requisição AJAX para buscar os dados da empresa
-                // Por enquanto, vou apenas abrir o modal
-                document.getElementById('companyModal').style.display = 'block';
-                document.getElementById('modalTitle').textContent = 'Editar Empresa';
-                document.getElementById('companyId').value = id;
-            }
-
-            function deleteCompany(id) {
-                if (confirm('Tem certeza que deseja excluir esta empresa?')) {
-                    // Aqui você pode fazer uma requisição para excluir a empresa
-                    window.location.href = '/companies/delete/' + id;
-                }
-            }
-
-            function testConnection(id) {
-                const statusElement = document.getElementById('status-' + id);
-                statusElement.textContent = 'Testando...';
-                statusElement.className = 'status-badge status-testing';
-                
-                // Simular teste de conexão
-                setTimeout(() => {
-                    // Aqui você faria uma requisição real para testar a conexão
-                    const isConnected = Math.random() > 0.5; // Simulação
-                    if (isConnected) {
-                        statusElement.textContent = 'Conectado';
-                        statusElement.className = 'status-badge status-connected';
-                    } else {
-                        statusElement.textContent = 'Desconectado';
-                        statusElement.className = 'status-badge status-disconnected';
-                    }
-                }, 2000);
-            }
-
-            window.onclick = function(event) {
-                const modal = document.getElementById('companyModal');
-                if (event.target == modal) {
-                    modal.style.display = 'none';
-                }
-            }
-        </script>
+        <!-- Lista de Empresas -->
+        <div class="companies-table">
+            <div class="table-header">
+                <h3 class="table-title">📋 Empresas Cadastradas</h3>
+            </div>
+            
+            {% if companies_list %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>IP:Porta</th>
+                            <th>Status Conexão</th>
+                            <th>Turma Ativa</th>
+                            <th>Usuários</th>
+                            <th>Última Conexão</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for company in companies_list %}
+                            <tr>
+                                <td>{{ company.name }}</td>
+                                <td>{{ company.mikrotik_ip }}:{{ company.mikrotik_port }}</td>
+                                <td>
+                                    <span class="status-badge {% if company.connection_status == 'connected' %}status-connected{% else %}status-disconnected{% endif %}">
+                                        {% if company.connection_status == 'connected' %}
+                                            🟢 Conectado
+                                        {% else %}
+                                            🔴 Desconectado
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('update_company_turma') }}" style="display: inline-flex; align-items: center;">
+                                        <input type="hidden" name="company_id" value="{{ company.id }}">
+                                        <select name="turma_ativa" class="turma-select">
+                                            <option value="A" {% if company.turma_ativa == 'A' %}selected{% endif %}>Turma A</option>
+                                            <option value="B" {% if company.turma_ativa == 'B' %}selected{% endif %}>Turma B</option>
+                                        </select>
+                                        <button type="submit" class="btn-small btn-update">✅</button>
+                                    </form>
+                                </td>
+                                <td>{{ company.user_count }} usuários</td>
+                                <td>
+                                    {% if company.last_connection_test %}
+                                        {{ company.last_connection_test }}
+                                    {% else %}
+                                        Nunca testado
+                                    {% endif %}
+                                </td>
+                                <td class="actions-cell">
+                                    <form method="POST" action="{{ url_for('test_company_connection', company_id=company.id) }}" style="display: inline;">
+                                        <button type="submit" class="btn-small btn-test">🔗 Testar</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('sync_company_users', company_id=company.id) }}" style="display: inline;">
+                                        <button type="submit" class="btn-small btn-sync">🔄 Sincronizar</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div style="text-align: center; padding: 3rem; color: #6b7280;">
+                    <p>📋 Nenhuma empresa cadastrada</p>
+                    <p>Adicione uma empresa para começar</p>
+                </div>
+            {% endif %}
+        </div>
     </main>
 </div>
 {% endblock %}

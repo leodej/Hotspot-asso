@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}Logs MikroTik - MikroTik Manager{% endblock %}
+
+{% block body %}
+<div class="container">
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">MT</div>
+            <div class="logo-text">
+                <h2>MikroTik Manager</h2>
+                <p>Sistema de Gestão</p>
+            </div>
+        </div>
+
+        <nav>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('users') }}" class="nav-link">Usuários</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('companies') }}" class="nav-link">Empresas</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('profiles') }}" class="nav-link">Perfis Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('hotspot_users') }}" class="nav-link">Usuários Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('credits') }}" class="nav-link">Créditos</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('reports') }}" class="nav-link">Relatórios</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('mikrotik_logs') }}" class="nav-link active">Logs MikroTik</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('settings') }}" class="nav-link">Configurações</a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="header">
+            <div>
+                <h1>Logs de Conexão MikroTik</h1>
+                <p>Monitore conexões e sincronizações com os roteadores</p>
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ user.name }}</span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
+            </div>
+        </div>
+
+        <style>
+            .stats-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
+
+            .stat-card {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                text-align: center;
+            }
+
+            .stat-number {
+                font-size: 2rem;
+                font-weight: bold;
+                color: #1f2937;
+                margin-bottom: 0.5rem;
+            }
+
+            .stat-label {
+                font-size: 0.875rem;
+                color: #6b7280;
+            }
+
+            .success { color: #10b981; }
+            .failed { color: #ef4444; }
+            .avg-time { color: #3b82f6; }
+
+            .filters-section {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                margin-bottom: 2rem;
+            }
+
+            .filters-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                align-items: end;
+            }
+
+            .filter-group {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .filter-label {
+                font-size: 0.875rem;
+                font-weight: 500;
+                color: #374151;
+                margin-bottom: 0.5rem;
+            }
+
+            .filter-select {
+                padding: 0.75rem;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                font-size: 0.875rem;
+            }
+
+            .filter-btn {
+                background: #3b82f6;
+                color: white;
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: 6px;
+                font-size: 0.875rem;
+                cursor: pointer;
+                height: fit-content;
+            }
+
+            .clear-btn {
+                background: #6b7280;
+                margin-left: 0.5rem;
+            }
+
+            .logs-table {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+
+            .table-header {
+                background: #f9fafb;
+                padding: 1rem 1.5rem;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            .table-title {
+                font-size: 1.125rem;
+                font-weight: 600;
+                color: #1f2937;
+            }
+
+            .table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            .table th,
+            .table td {
+                padding: 0.75rem 1.5rem;
+                text-align: left;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            .table th {
+                background: #f9fafb;
+                font-weight: 600;
+                color: #374151;
+                font-size: 0.875rem;
+            }
+
+            .table td {
+                font-size: 0.875rem;
+                color: #1f2937;
+            }
+
+            .status-badge {
+                padding: 0.25rem 0.75rem;
+                border-radius: 9999px;
+                font-size: 0.75rem;
+                font-weight: 500;
+            }
+
+            .status-success {
+                background: #d1fae5;
+                color: #065f46;
+            }
+
+            .status-failed {
+                background: #fee2e2;
+                color: #991b1b;
+            }
+
+            .action-badge {
+                padding: 0.25rem 0.5rem;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                font-weight: 500;
+                background: #e5e7eb;
+                color: #374151;
+            }
+
+            .response-time {
+                font-family: monospace;
+                color: #6b7280;
+            }
+
+            .no-logs {
+                text-align: center;
+                padding: 3rem;
+                color: #6b7280;
+            }
+        </style>
+
+        <!-- Estatísticas -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.total_logs or 0 }}</div>
+                <div class="stat-label">Total de Logs (24h)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number success">{{ stats.success_count or 0 }}</div>
+                <div class="stat-label">Conexões Bem-sucedidas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number failed">{{ stats.failed_count or 0 }}</div>
+                <div class="stat-label">Conexões Falharam</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number avg-time">{{ "%.2f"|format(stats.avg_response_time or 0) }}s</div>
+                <div class="stat-label">Tempo Médio de Resposta</div>
+            </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filters-section">
+            <form method="GET">
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">Empresa</label>
+                        <select name="company" class="filter-select">
+                            <option value="">Todas as empresas</option>
+                            {% for company in companies_list %}
+                                <option value="{{ company.id }}" 
+                                        {% if selected_company == company.id %}selected{% endif %}>
+                                    {{ company.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label class="filter-label">Ação</label>
+                        <select name="action" class="filter-select">
+                            <option value="">Todas as ações</option>
+                            <option value="test_connection" {% if selected_action == 'test_connection' %}selected{% endif %}>
+                                Teste de Conexão
+                            </option>
+                            <option value="sync_users" {% if selected_action == 'sync_users' %}selected{% endif %}>
+                                Sincronização de Usuários
+                            </option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label class="filter-label">Status</label>
+                        <select name="status" class="filter-select">
+                            <option value="">Todos os status</option>
+                            <option value="success" {% if selected_status == 'success' %}selected{% endif %}>
+                                Sucesso
+                            </option>
+                            <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>
+                                Falha
+                            </option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <button type="submit" class="filter-btn">🔍 Filtrar</button>
+                        <a href="{{ url_for('mikrotik_logs') }}" class="filter-btn clear-btn">🗑️ Limpar</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Tabela de Logs -->
+        <div class="logs-table">
+            <div class="table-header">
+                <h3 class="table-title">Histórico de Conexões</h3>
+            </div>
+            
+            {% if logs_list %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Empresa</th>
+                            <th>Ação</th>
+                            <th>Status</th>
+                            <th>Tempo Resposta</th>
+                            <th>IP:Porta</th>
+                            <th>Mensagem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs_list %}
+                            <tr>
+                                <td>{{ log.created_at }}</td>
+                                <td>{{ log.company_name }}</td>
+                                <td>
+                                    <span class="action-badge">
+                                        {% if log.action == 'test_connection' %}
+                                            🔗 Teste Conexão
+                                        {% elif log.action == 'sync_users' %}
+                                            🔄 Sincronização
+                                        {% else %}
+                                            {{ log.action }}
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="status-badge {% if log.status == 'success' %}status-success{% else %}status-failed{% endif %}">
+                                        {% if log.status == 'success' %}
+                                            ✅ Sucesso
+                                        {% else %}
+                                            ❌ Falha
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if log.response_time %}
+                                        <span class="response-time">{{ "%.3f"|format(log.response_time) }}s</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.ip_address and log.port %}
+                                        {{ log.ip_address }}:{{ log.port }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>{{ log.message or '-' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="no-logs">
+                    <p>📋 Nenhum log encontrado com os filtros aplicados</p>
+                    <p>Teste uma conexão com MikroTik para gerar logs</p>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

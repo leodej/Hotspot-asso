@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -83,6 +85,10 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [testingEmail, setTestingEmail] = useState(false)
   const [testingBackup, setTestingBackup] = useState(false)
+
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string>("")
+  const [systemName, setSystemName] = useState<string>("MikroTik Manager")
 
   useEffect(() => {
     fetchSettings()
@@ -189,6 +195,39 @@ export default function SettingsPage() {
     }))
   }
 
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setLogoFile(file)
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setLogoPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const saveSystemBranding = async () => {
+    try {
+      const formData = new FormData()
+      if (logoFile) {
+        formData.append("logo", logoFile)
+      }
+      formData.append("systemName", systemName)
+
+      const response = await fetch("/api/settings/branding", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (response.ok) {
+        console.log("Configurações de marca salvas com sucesso")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar configurações de marca:", error)
+    }
+  }
+
   const getStatusColor = (percentage: number) => {
     if (percentage < 50) return "text-green-500"
     if (percentage < 80) return "text-yellow-500"
@@ -221,13 +260,14 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="general" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="general">Geral</TabsTrigger>
             <TabsTrigger value="mikrotik">MikroTik</TabsTrigger>
             <TabsTrigger value="monitoring">Monitoramento</TabsTrigger>
             <TabsTrigger value="email">Email</TabsTrigger>
             <TabsTrigger value="backup">Backup</TabsTrigger>
             <TabsTrigger value="system">Sistema</TabsTrigger>
+            <TabsTrigger value="branding">Marca</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4">
@@ -693,6 +733,67 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="branding" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="h-5 w-5" />
+                  <span>Identidade Visual</span>
+                </CardTitle>
+                <CardDescription>Configure o logo e nome do sistema</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="systemName">Nome do Sistema</Label>
+                    <Input
+                      id="systemName"
+                      value={systemName}
+                      onChange={(e) => setSystemName(e.target.value)}
+                      placeholder="MikroTik Manager"
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label htmlFor="logoUpload">Logo do Sistema</Label>
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-shrink-0">
+                        {logoPreview ? (
+                          <img
+                            src={logoPreview || "/placeholder.svg"}
+                            alt="Preview do logo"
+                            className="w-16 h-16 object-contain border rounded-lg"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 bg-gray-100 border rounded-lg flex items-center justify-center">
+                            <Settings className="h-8 w-8 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <Input
+                          id="logoUpload"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          className="cursor-pointer"
+                        />
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Formatos aceitos: PNG, JPG, SVG. Será redimensionado automaticamente para 64x64px.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button onClick={saveSystemBranding} className="w-full">
+                    <Save className="mr-2 h-4 w-4" />
+                    Salvar Configurações de Marca
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
