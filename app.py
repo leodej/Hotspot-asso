@@ -475,7 +475,7 @@ def parse_mikrotik_users_usage(output):
             # Extrair comment: comment="valor" ou comment=valor
             comment_match = re.search(r'comment=(?:"([^"]+)"|([^\s]+))', line)
             if comment_match:
-                current_user['comment'] = comment_match.group(1) or comment_match.group(2)
+                current_user['comment'] = comment_match.group(1) or name_match.group(2)
     
     # Adicionar último usuário
     if current_user:
@@ -1513,9 +1513,6 @@ def credits():
     # Aplicar filtro de mês
     if month_filter:
         base_query += ' AND strftime("%Y-%m", uc.created_at) = ?'
-        params.append(month_filter)
-    
-    base_query += ' ORDER BY uc.updated_at' = ?'
         params.append(month_filter)
     
     base_query += ' ORDER BY uc.updated_at DESC'
