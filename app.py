@@ -327,6 +327,74 @@ def test_mikrotik_connection(company_id, ip_address, port, username, password):
         )
         return False, f'Erro inesperado: {str(e)}'
 
+def create_mikrotik_profile(company_id, profile_name, download_limit, upload_limit, time_limit=None):
+    """Cria perfil no MikroTik"""
+    conn = get_db()
+    company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
+    conn.close()
+    
+    if not company:
+        return False, 'Empresa não encontrada'
+    
+    start_time = time.time()
+    
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        ssh.connect(
+            hostname=company['mikrotik_ip'],
+            port=int(company['mikrotik_port']),
+            username=company['mikrotik_user'],
+            password=company['mikrotik_password'],
+            timeout=10
+        )
+        
+        # Construir comando para criar perfil
+        rate_limit = f"{upload_limit}M/{download_limit}M"
+        command = f'/ip hotspot user profile add name="{profile_name}" rate-limit="{rate_limit}"'
+        
+        # Adicionar limite de tempo se especificado
+        if time_limit:
+            command += f' session-timeout="{time_limit}m"'
+        
+        stdin, stdout, stderr = ssh.exec_command(command)
+        error = stderr.read().decode('utf-8')
+        
+        ssh.close()
+        
+        response_time = time.time() - start_time
+        
+        if error and 'already exists' not in error:
+            log_mikrotik_connection(
+                company_id, 'create_profile', 'failed', 
+                f'Erro ao criar perfil {profile_name}: {error}', 
+                response_time, company['mikrotik_ip'], company['mikrotik_port']
+            )
+            return False, f'Erro ao criar perfil: {error}'
+        
+        message = f'Perfil {profile_name} criado com sucesso'
+        if 'already exists' in error:
+            message = f'Perfil {profile_name} já existe no MikroTik'
+        
+        log_mikrotik_connection(
+            company_id, 'create_profile', 'success', 
+            message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        return True, message
+        
+    except Exception as e:
+        response_time = time.time() - start_time
+        error_message = f'Erro ao criar perfil {profile_name}: {str(e)}'
+        
+        log_mikrotik_connection(
+            company_id, 'create_profile', 'failed', 
+            error_message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        return False, error_message
+
 def sync_hotspot_users_to_mikrotik(company_id):
     """Sincroniza usuários hotspot com o MikroTik"""
     conn = get_db()
@@ -336,10 +404,12 @@ def sync_hotspot_users_to_mikrotik(company_id):
     if not company:
         return False, 'Empresa não encontrada'
     
-    # Buscar usuários ativos da turma ativa
+    # Buscar usuários ativos da turma ativa com seus perfis
     users = conn.execute('''
-        SELECT * FROM hotspot_users 
-        WHERE company_id = ? AND active = 1 AND turma = ?
+        SELECT hu.*, hp.name as profile_name
+        FROM hotspot_users hu
+        LEFT JOIN hotspot_profiles hp ON hu.profile_id = hp.id
+        WHERE hu.company_id = ? AND hu.active = 1 AND hu.turma = ?
     ''', (company_id, company['turma_ativa'])).fetchall()
     
     conn.close()
@@ -362,8 +432,11 @@ def sync_hotspot_users_to_mikrotik(company_id):
         
         for user in users:
             try:
+                # Usar o perfil do usuário ou "default" se não tiver perfil
+                profile_name = user['profile_name'] if user['profile_name'] else 'default'
+                
                 # Comando para adicionar/atualizar usuário no hotspot
-                command = f'/ip hotspot user add name="{user["username"]}" password="{user["password"]}" profile="default"'
+                command = f'/ip hotspot user add name="{user["username"]}" password="{user["password"]}" profile="{profile_name}"'
                 stdin, stdout, stderr = ssh.exec_command(command)
                 
                 error = stderr.read().decode('utf-8')
@@ -786,14 +859,25 @@ def profiles():
             flash('Campos obrigatórios não preenchidos', 'error')
         else:
             conn = get_db()
+            profile_id = str(uuid.uuid4())
             conn.execute('''
                 INSERT INTO hotspot_profiles (id, company_id, name, download_limit, upload_limit, time_limit)
                 VALUES (?, ?, ?, ?, ?, ?)
-            ''', (str(uuid.uuid4()), company_id, name, int(download_limit), int(upload_limit), 
+            ''', (profile_id, company_id, name, int(download_limit), int(upload_limit), 
                   int(time_limit) if time_limit else None))
             conn.commit()
             conn.close()
-            flash('Perfil criado com sucesso!', 'success')
+            
+            # Criar perfil no MikroTik
+            success, message = create_mikrotik_profile(
+                company_id, name, int(download_limit), int(upload_limit), 
+                int(time_limit) if time_limit else None
+            )
+            
+            if success:
+                flash(f'Perfil criado no sistema e no MikroTik: {message}', 'success')
+            else:
+                flash(f'Perfil criado no sistema, mas erro no MikroTik: {message}', 'warning')
         
         return redirect(url_for('profiles'))
     
