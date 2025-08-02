@@ -867,6 +867,33 @@ def companies():
                          companies_list=companies_list,
                          settings=current_settings)
 
+@app.route('/companies/<company_id>/edit', methods=['POST'])
+@require_auth
+def edit_company(company_id):
+    """Editar empresa"""
+    name = request.form.get('name')
+    mikrotik_ip = request.form.get('mikrotik_ip')
+    mikrotik_port = request.form.get('mikrotik_port', 22)
+    mikrotik_user = request.form.get('mikrotik_user')
+    mikrotik_password = request.form.get('mikrotik_password')
+    turma_ativa = request.form.get('turma_ativa', 'A')
+    
+    if not all([name, mikrotik_ip, mikrotik_user, mikrotik_password]):
+        flash('Todos os campos são obrigatórios', 'error')
+    else:
+        conn = get_db()
+        conn.execute('''
+            UPDATE companies 
+            SET name = ?, mikrotik_ip = ?, mikrotik_port = ?, mikrotik_user = ?, mikrotik_password = ?, turma_ativa = ?
+            WHERE id = ?
+        ''', (name, mikrotik_ip, int(mikrotik_port), mikrotik_user, mikrotik_password, turma_ativa, company_id))
+        conn.commit()
+        conn.close()
+        
+        flash('Empresa atualizada com sucesso!', 'success')
+    
+    return redirect(url_for('companies'))
+
 @app.route('/companies/<company_id>/test-connection', methods=['POST'])
 @require_auth
 def test_company_connection(company_id):
@@ -1466,6 +1493,8 @@ def settings():
                     else:
                         os.remove(file_path)
                         flash('Erro ao processar imagem', 'error')
+                except Exception as e:
+                    flash(f'Erro ao salvar logo  'error')
                 except Exception as e:
                     flash(f'Erro ao salvar logo: {str(e)}', 'error')
         

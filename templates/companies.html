@@ -171,6 +171,10 @@
                 background: #8b5cf6;
                 color: white;
             }
+            .btn-edit {
+                background: #f59e0b;
+                color: white;
+            }
             .btn-delete {
                 background: #ef4444;
                 color: white;
@@ -374,6 +378,9 @@
                             📥 Importar
                         </button>
                     </form>
+                    <button type="button" class="btn-action btn-edit" title="Editar Empresa" onclick="editCompany('{{ company.id }}', '{{ company.name }}', '{{ company.mikrotik_ip }}', '{{ company.mikrotik_port }}', '{{ company.mikrotik_user }}', '{{ company.mikrotik_password }}', '{{ company.turma_ativa }}')">
+                        ✏️ Editar
+                    </button>
                 </div>
             </div>
             {% else %}
@@ -385,11 +392,12 @@
             {% endfor %}
         </div>
 
-        <!-- Modal de Cadastro -->
+        <!-- Modal de Cadastro/Edição -->
         <div id="companyModal" class="modal">
             <div class="modal-content">
                 <h3 id="modalTitle">Cadastrar Nova Empresa</h3>
                 <form id="companyForm" method="POST">
+                    <input type="hidden" id="companyId" name="company_id" value="">
                     <div class="form-group">
                         <label class="form-label">Nome da Empresa</label>
                         <input type="text" id="companyName" name="name" class="form-input" required>
@@ -419,7 +427,7 @@
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
-                        <button type="submit" class="btn-primary">Salvar</button>
+                        <button type="submit" class="btn-primary" id="submitBtn">Salvar</button>
                     </div>
                 </form>
             </div>
@@ -429,7 +437,25 @@
             function openModal() {
                 document.getElementById('companyModal').style.display = 'block';
                 document.getElementById('modalTitle').textContent = 'Cadastrar Nova Empresa';
+                document.getElementById('companyForm').action = '{{ url_for("companies") }}';
                 document.getElementById('companyForm').reset();
+                document.getElementById('companyId').value = '';
+                document.getElementById('submitBtn').textContent = 'Salvar';
+            }
+
+            function editCompany(id, name, ip, port, user, password, turma) {
+                document.getElementById('companyModal').style.display = 'block';
+                document.getElementById('modalTitle').textContent = 'Editar Empresa';
+                document.getElementById('companyForm').action = '/companies/' + id + '/edit';
+                
+                document.getElementById('companyId').value = id;
+                document.getElementById('companyName').value = name;
+                document.getElementById('companyIp').value = ip;
+                document.getElementById('companyPort').value = port;
+                document.getElementById('companyUser').value = user;
+                document.getElementById('companyPassword').value = password;
+                document.getElementById('companyTurma').value = turma;
+                document.getElementById('submitBtn').textContent = 'Atualizar';
             }
 
             function closeModal() {
