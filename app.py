@@ -10,6 +10,7 @@ from PIL import Image
 import socket
 import paramiko
 import time
+import re
 
 app = Flask(__name__)
 app.secret_key = 'mikrotik-manager-super-secret-key-2024'
@@ -395,6 +396,151 @@ def create_mikrotik_profile(company_id, profile_name, download_limit, upload_lim
         
         return False, error_message
 
+def import_mikrotik_users(company_id):
+    """Importa usuários hotspot do MikroTik para o sistema"""
+    conn = get_db()
+    company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
+    
+    if not company:
+        return False, 'Empresa não encontrada'
+    
+    start_time = time.time()
+    
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        ssh.connect(
+            hostname=company['mikrotik_ip'],
+            port=int(company['mikrotik_port']),
+            username=company['mikrotik_user'],
+            password=company['mikrotik_password'],
+            timeout=10
+        )
+        
+        # Executar comando para listar usuários hotspot
+        stdin, stdout, stderr = ssh.exec_command('/ip hotspot user print detail')
+        output = stdout.read().decode('utf-8')
+        error = stderr.read().decode('utf-8')
+        
+        ssh.close()
+        
+        if error:
+            response_time = time.time() - start_time
+            log_mikrotik_connection(
+                company_id, 'import_users', 'failed', 
+                f'Erro ao listar usuários: {error}', 
+                response_time, company['mikrotik_ip'], company['mikrotik_port']
+            )
+            return False, f'Erro ao listar usuários: {error}'
+        
+        # Fazer parsing da saída
+        users_data = parse_mikrotik_users(output)
+        
+        imported_count = 0
+        skipped_count = 0
+        default_credit = int(get_setting('default_credit_mb', 1024))
+        
+        for user_data in users_data:
+            username = user_data.get('name', '')
+            password = user_data.get('password', 'imported123')  # Senha padrão para importados
+            profile_name = user_data.get('profile', 'default')
+            disabled = user_data.get('disabled', 'false') == 'true'
+            
+            if not username:
+                continue
+            
+            # Verificar se usuário já existe
+            existing_user = conn.execute(
+                'SELECT id FROM hotspot_users WHERE username = ? AND company_id = ?', 
+                (username, company_id)
+            ).fetchone()
+            
+            if existing_user:
+                skipped_count += 1
+                continue
+            
+            # Buscar perfil no sistema (se existir)
+            profile_id = None
+            if profile_name != 'default':
+                profile = conn.execute(
+                    'SELECT id FROM hotspot_profiles WHERE name = ? AND company_id = ?', 
+                    (profile_name, company_id)
+                ).fetchone()
+                if profile:
+                    profile_id = profile['id']
+            
+            # Inserir usuário
+            user_id = str(uuid.uuid4())
+            user_active = 0 if disabled else 1
+            
+            conn.execute('''
+                INSERT INTO hotspot_users (id, company_id, profile_id, username, password, turma, active)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, company_id, profile_id, username, password, company['turma_ativa'], user_active))
+            
+            # Criar crédito inicial
+            conn.execute('''
+                INSERT INTO user_credits (id, hotspot_user_id, total_mb, remaining_mb, last_reset)
+                VALUES (?, ?, ?, ?, DATE('now'))
+            ''', (str(uuid.uuid4()), user_id, default_credit, default_credit))
+            
+            imported_count += 1
+        
+        conn.commit()
+        conn.close()
+        
+        response_time = time.time() - start_time
+        message = f'Importados {imported_count} usuários, {skipped_count} já existiam'
+        
+        log_mikrotik_connection(
+            company_id, 'import_users', 'success', 
+            message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        return True, message
+        
+    except Exception as e:
+        response_time = time.time() - start_time
+        error_message = f'Erro na importação: {str(e)}'
+        
+        log_mikrotik_connection(
+            company_id, 'import_users', 'failed', 
+            error_message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        return False, error_message
+
+def parse_mikrotik_users(output):
+    """Faz parsing da saída do comando /ip hotspot user print detail"""
+    users = []
+    current_user = {}
+    
+    lines = output.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        
+        # Nova entrada de usuário (começa com número)
+        if re.match(r'^\d+', line):
+            if current_user:
+                users.append(current_user)
+            current_user = {}
+            continue
+        
+        # Parsing dos campos
+        if '=' in line:
+            key, value = line.split('=', 1)
+            key = key.strip()
+            value = value.strip()
+            current_user[key] = value
+    
+    # Adicionar último usuário
+    if current_user:
+        users.append(current_user)
+    
+    return users
+
 def sync_hotspot_users_to_mikrotik(company_id):
     """Sincroniza usuários hotspot com o MikroTik"""
     conn = get_db()
@@ -748,6 +894,27 @@ def sync_company_users(company_id):
         flash(f'Sincronização com {company["name"]}: {message}', 'success')
     else:
         flash(f'Falha na sincronização com {company["name"]}: {message}', 'error')
+    
+    return redirect(url_for('companies'))
+
+@app.route('/companies/<company_id>/import-users', methods=['POST'])
+@require_auth
+def import_company_users(company_id):
+    """Importar usuários do MikroTik"""
+    conn = get_db()
+    company = conn.execute('SELECT name FROM companies WHERE id = ?', (company_id,)).fetchone()
+    conn.close()
+    
+    if not company:
+        flash('Empresa não encontrada', 'error')
+        return redirect(url_for('companies'))
+    
+    success, message = import_mikrotik_users(company_id)
+    
+    if success:
+        flash(f'Importação de {company["name"]}: {message}', 'success')
+    else:
+        flash(f'Falha na importação de {company["name"]}: {message}', 'error')
     
     return redirect(url_for('companies'))
 
