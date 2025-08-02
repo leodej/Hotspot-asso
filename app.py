@@ -448,38 +448,41 @@ def collect_user_usage_from_mikrotik(company_id):
         return False, error_message
 
 def parse_mikrotik_users_usage(output):
-    """Faz parsing da saída do comando /ip hotspot user print detail"""
+    """Faz parsing da saída do comando /ip hotspot user print where comment~".*" """
     users = []
-    current_user = {}
-    
     lines = output.split('\n')
     
-    for line in lines:
-        line = line.strip()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
         
-        # Nova entrada de usuário (começa com número)
-        if re.match(r'^\d+', line):
-            if current_user:
-                users.append(current_user)
-            current_user = {}
-            continue
-        
-        # Parsing dos campos usando regex para extrair valores corretos
-        if 'name=' in line:
-            # Extrair nome: name="valor" ou name=valor
-            name_match = re.search(r'name=(?:"([^"]+)"|([^\s]+))', line)
-            if name_match:
-                current_user['name'] = name_match.group(1) or name_match.group(2)
-        
-        if 'comment=' in line:
-            # Extrair comment: comment="valor" ou comment=valor
-            comment_match = re.search(r'comment=(?:"([^"]+)"|([^\s]+))', line)
-            if comment_match:
-                current_user['comment'] = comment_match.group(1) or name_match.group(2)
-    
-    # Adicionar último usuário
-    if current_user:
-        users.append(current_user)
+        # Procurar por linha de consumo que começa com ";;; Consumo total:"
+        if line.startswith(';;; Consumo total:'):
+            # Extrair o valor de consumo
+            consumption_line = line
+            
+            # Próxima linha deve conter os dados do usuário
+            if i + 1 < len(lines):
+                user_line = lines[i + 1].strip()
+                
+                # Parse da linha do usuário: número, nome, perfil, tempo
+                # Exemplo: "6             eng.geirkvig    default        4h52s"
+                parts = user_line.split()
+                if len(parts) >= 2:
+                    # O nome do usuário é sempre a segunda parte
+                    username = parts[1]
+                    
+                    user_data = {
+                        'name': username,
+                        'comment': consumption_line
+                    }
+                    users.append(user_data)
+                
+                i += 2  # Pular as duas linhas processadas
+            else:
+                i += 1
+        else:
+            i += 1
     
     return users
 
@@ -489,7 +492,22 @@ def parse_usage_from_comment(comment):
         return None
     
     try:
-        # Procurar por padrões como "Total consumido: 1024 MB", "1024MB", "1.5GB", "512 MB", etc.
+        # Procurar por padrão ";;; Consumo total: XXX.XX MB" ou ";;; Consumo total: X.XX GB"
+        if ';;; Consumo total:' in comment:
+            # Extrair a parte após "Consumo total:"
+            consumption_part = comment.split('Consumo total:')[1].strip()
+            
+            # Procurar por MB
+            mb_match = re.search(r'(\d+(?:\.\d+)?)\s*MB', consumption_part, re.IGNORECASE)
+            if mb_match:
+                return int(float(mb_match.group(1)))
+            
+            # Procurar por GB
+            gb_match = re.search(r'(\d+(?:\.\d+)?)\s*GB', consumption_part, re.IGNORECASE)
+            if gb_match:
+                return int(float(gb_match.group(1)) * 1024)
+        
+        # Fallback para outros formatos
         # Primeiro tentar MB
         mb_match = re.search(r'(\d+(?:\.\d+)?)\s*MB', comment, re.IGNORECASE)
         if mb_match:
@@ -504,11 +522,6 @@ def parse_usage_from_comment(comment):
         kb_match = re.search(r'(\d+(?:\.\d+)?)\s*KB', comment, re.IGNORECASE)
         if kb_match:
             return int(float(kb_match.group(1)) / 1024)
-        
-        # Tentar apenas números (assumir MB)
-        num_match = re.search(r'(\d+(?:\.\d+)?)', comment)
-        if num_match:
-            return int(float(num_match.group(1)))
             
     except (ValueError, AttributeError):
         pass
