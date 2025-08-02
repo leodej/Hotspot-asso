@@ -528,12 +528,30 @@ def parse_mikrotik_users(output):
             current_user = {}
             continue
         
-        # Parsing dos campos
-        if '=' in line:
-            key, value = line.split('=', 1)
-            key = key.strip()
-            value = value.strip()
-            current_user[key] = value
+        # Parsing dos campos usando regex para extrair valores corretos
+        if 'name=' in line:
+            # Extrair nome: name="valor" ou name=valor
+            name_match = re.search(r'name=(?:"([^"]+)"|([^\s]+))', line)
+            if name_match:
+                current_user['name'] = name_match.group(1) or name_match.group(2)
+        
+        if 'password=' in line:
+            # Extrair senha: password="valor" ou password=valor
+            password_match = re.search(r'password=(?:"([^"]+)"|([^\s]+))', line)
+            if password_match:
+                current_user['password'] = password_match.group(1) or password_match.group(2)
+        
+        if 'profile=' in line:
+            # Extrair perfil: profile="valor" ou profile=valor
+            profile_match = re.search(r'profile=(?:"([^"]+)"|([^\s]+))', line)
+            if profile_match:
+                current_user['profile'] = profile_match.group(1) or profile_match.group(2)
+        
+        if 'disabled=' in line:
+            # Extrair status disabled: disabled=true ou disabled=false
+            disabled_match = re.search(r'disabled=([^\s]+)', line)
+            if disabled_match:
+                current_user['disabled'] = disabled_match.group(1)
     
     # Adicionar último usuário
     if current_user:
@@ -831,7 +849,7 @@ def companies():
     companies_list = conn.execute('''
         SELECT *, 
                (SELECT COUNT(*) FROM hotspot_users WHERE company_id = companies.id AND active = 1) as user_count
-        FROM companies 
+        FROM companies
         WHERE active = 1 
         ORDER BY created_at DESC
     ''').fetchall()
