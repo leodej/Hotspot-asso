@@ -618,7 +618,18 @@ def companies():
     ''').fetchall()
     conn.close()
     
-    return render_template('companies.html', user={'name': session.get('name')}, companies_list=companies_list)
+    # Buscar configurações atuais
+    conn_settings = get_db()
+    current_settings = {}
+    settings_rows = conn_settings.execute('SELECT key, value FROM system_settings').fetchall()
+    for row in settings_rows:
+        current_settings[row['key']] = row['value']
+    conn_settings.close()
+
+    return render_template('companies.html', 
+                         user={'name': session.get('name')}, 
+                         companies_list=companies_list,
+                         settings=current_settings)
 
 @app.route('/companies/<company_id>/test-connection', methods=['POST'])
 @require_auth
