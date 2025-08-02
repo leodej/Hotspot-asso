@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block title %}Relatórios - MikroTik Manager{% endblock %}
+
+{% block body %}
+<div class="container">
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">MT</div>
+            <div class="logo-text">
+                <h2>MikroTik Manager</h2>
+                <p>Sistema de Gestão</p>
+            </div>
+        </div>
+
+        <nav>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('users') }}" class="nav-link">Usuários</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('companies') }}" class="nav-link">Empresas</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('profiles') }}" class="nav-link">Perfis Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('hotspot_users') }}" class="nav-link">Usuários Hotspot</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('credits') }}" class="nav-link">Créditos</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('reports') }}" class="nav-link active">Relatórios</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('settings') }}" class="nav-link">Configurações</a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="header">
+            <div>
+                <h1>Relatórios e Análises</h1>
+                <p>Visualize dados e estatísticas do sistema</p>
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ user.name }}</span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
+            </div>
+        </div>
+
+        <style>
+            .reports-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .report-card {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                padding: 1.5rem;
+                transition: transform 0.2s;
+                cursor: pointer;
+            }
+
+            .report-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+
+            .report-icon {
+                width: 48px;
+                height: 48px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.5rem;
+                color: white;
+                margin-bottom: 1rem;
+            }
+
+            .icon-usage {
+                background: #3b82f6;
+            }
+
+            .icon-users {
+                background: #10b981;
+            }
+
+            .icon-companies {
+                background: #f59e0b;
+            }
+
+            .icon-credits {
+                background: #8b5cf6;
+            }
+
+            .report-title {
+                font-size: 1.125rem;
+                font-weight: 600;
+                color: #1f2937;
+                margin-bottom: 0.5rem;
+            }
+
+            .report-description {
+                font-size: 0.875rem;
+                color: #6b7280;
+                margin-bottom: 1rem;
+            }
+
+            .report-actions {
+                display: flex;
+                gap: 0.5rem;
+            }
+
+            .btn-sm {
+                padding: 0.5rem 1rem;
+                font-size: 0.75rem;
+                border-radius: 4px;
+                border: none;
+                cursor: pointer;
+                text-decoration: none;
+            }
+
+            .btn-primary {
+                background: #3b82f6;
+                color: white;
+            }
+
+            .btn-secondary {
+                background: #6b7280;
+                color: white;
+            }
+
+            .filters-section {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                padding: 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .filters-title {
+                font-size: 1.125rem;
+                font-weight: 600;
+                color: #1f2937;
+                margin-bottom: 1rem;
+            }
+
+            .filters-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            .form-group {
+                margin-bottom: 0;
+            }
+
+            .form-label {
+                display: block;
+                margin-bottom: 0.5rem;
+                font-weight: 500;
+                font-size: 0.875rem;
+            }
+
+            .form-input, .form-select {
+                width: 100%;
+                padding: 0.5rem;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                font-size: 0.875rem;
+            }
+
+            .chart-container {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                padding: 2rem;
+                margin-bottom: 2rem;
+            }
+
+            .chart-container h3 {
+                margin-bottom: 1rem;
+                color: #1f2937;
+                font-size: 1.25rem;
+                font-weight: 600;
+            }
+
+            .stats-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 2rem;
+                margin: 2rem 0;
+            }
+
+            .stat-item {
+                text-align: center;
+            }
+
+            .stat-value {
+                font-size: 2rem;
+                font-weight: bold;
+                margin-bottom: 0.5rem;
+            }
+
+            .stat-label {
+                font-size: 0.875rem;
+                color: #6b7280;
+            }
+
+            .chart-placeholder {
+                background: #f9fafb;
+                border: 2px dashed #d1d5db;
+                border-radius: 8px;
+                padding: 3rem;
+                text-align: center;
+                color: #6b7280;
+                margin: 1rem 0;
+            }
+
+            .data-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 1rem;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 0.75rem;
+                text-align: left;
+                border-bottom: 1px solid #e5e7eb;
+            }
+
+            .data-table th {
+                background: #f9fafb;
+                font-weight: 600;
+                color: #374151;
+            }
+
+            .data-table tr:hover {
+                background: #f9fafb;
+            }
+        </style>
+
+        <form method="GET" class="filters-section">
+            <h3 class="filters-title">Filtros de Relatório</h3>
+            <div class="filters-grid">
+                <div class="form-group">
+                    <label class="form-label">Período</label>
+                    <select name="period" class="form-select" onchange="toggleCustomDates()">
+                        <option value="7" {% if selected_period == '7' %}selected{% endif %}>Últimos 7 dias</option>
+                        <option value="30" {% if selected_period == '30' %}selected{% endif %}>Últimos 30 dias</option>
+                        <option value="90" {% if selected_period == '90' %}selected{% endif %}>Últimos 3 meses</option>
+                        <option value="custom" {% if selected_period == 'custom' %}selected{% endif %}>Personalizado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Empresa</label>
+                    <select name="company" class="form-select">
+                        <option value="">Todas as empresas</option>
+                        {% for company in companies_list %}
+                        <option value="{{ company.id }}" {% if selected_company == company.id %}selected{% endif %}>
+                            {{ company.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" id="start-date-group" style="display: {% if selected_period == 'custom' %}block{% else %}none{% endif %};">
+                    <label class="form-label">Data Inicial</label>
+                    <input type="date" name="start_date" class="form-input" value="{{ selected_start_date }}">
+                </div>
+                <div class="form-group" id="end-date-group" style="display: {% if selected_period == 'custom' %}block{% else %}none{% endif %};">
+                    <label class="form-label">Data Final</label>
+                    <input type="date" name="end_date" class="form-input" value="{{ selected_end_date }}">
+                </div>
+            </div>
+            <button type="submit" class="btn-primary">Aplicar Filtros</button>
+            <a href="{{ url_for('reports') }}" class="btn-secondary" style="margin-left: 0.5rem;">Limpar Filtros</a>
+        </form>
+
+        <div class="chart-container">
+            <h3>Estatísticas Gerais</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" style="color: #3b82f6;">{{ stats.total_users or 0 }}</div>
+                    <div class="stat-label">Total de Usuários</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" style="color: #10b981;">{{ stats.active_users or 0 }}</div>
+                    <div class="stat-label">Usuários Ativos</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" style="color: #f59e0b;">{{ stats.total_companies or 0 }}</div>
+                    <div class="stat-label">Empresas</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" style="color: #8b5cf6;">{{ "%.1f"|format((stats.used_data_mb or 0) / 1024) }} GB</div>
+                    <div class="stat-label">Dados Consumidos</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3>Uso de Dados por Empresa</h3>
+            <div class="chart-placeholder">
+                <p>📊 Gráfico de Uso por Empresa</p>
+                <p style="font-size: 0.875rem; margin-top: 1rem;">
+                    Dados baseados nos filtros aplicados
+                </p>
+            </div>
+            {% if chart_data.usage_by_company.labels %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Empresa</th>
+                        <th>Dados Consumidos (MB)</th>
+                        <th>Dados Consumidos (GB)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(chart_data.usage_by_company.labels|length) %}
+                    <tr>
+                        <td>{{ chart_data.usage_by_company.labels[i] }}</td>
+                        <td>{{ chart_data.usage_by_company.data[i] or 0 }}</td>
+                        <td>{{ "%.2f"|format((chart_data.usage_by_company.data[i] or 0) / 1024) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+
+        <div class="chart-container">
+            <h3>Usuários por Turma</h3>
+            <div class="chart-placeholder">
+                <p>👥 Gráfico de Usuários por Turma</p>
+                <p style="font-size: 0.875rem; margin-top: 1rem;">
+                    Distribuição de usuários entre as turmas A e B
+                </p>
+            </div>
+            {% if chart_data.users_by_turma.labels %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Turma</th>
+                        <th>Total de Usuários</th>
+                        <th>Usuários Ativos</th>
+                        <th>Taxa de Ativação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(chart_data.users_by_turma.labels|length) %}
+                    <tr>
+                        <td>{{ chart_data.users_by_turma.labels[i] }}</td>
+                        <td>{{ chart_data.users_by_turma.data[i] or 0 }}</td>
+                        <td>{{ chart_data.users_by_turma.active_data[i] or 0 }}</td>
+                        <td>
+                            {% if chart_data.users_by_turma.data[i] and chart_data.users_by_turma.data[i] > 0 %}
+                                {{ "%.1f"|format((chart_data.users_by_turma.active_data[i] or 0) * 100 / chart_data.users_by_turma.data[i]) }}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+
+        <div class="chart-container">
+            <h3>Evolução de Créditos</h3>
+            <div class="chart-placeholder">
+                <p>📈 Gráfico de Evolução dos Créditos</p>
+                <p style="font-size: 0.875rem; margin-top: 1rem;">
+                    Histórico de créditos totais e utilizados ao longo do tempo
+                </p>
+            </div>
+            {% if chart_data.credits_timeline.labels %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Créditos Totais (MB)</th>
+                        <th>Créditos Utilizados (MB)</th>
+                        <th>Taxa de Uso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(chart_data.credits_timeline.labels|length) %}
+                    <tr>
+                        <td>{{ chart_data.credits_timeline.labels[i] }}</td>
+                        <td>{{ chart_data.credits_timeline.total_data[i] or 0 }}</td>
+                        <td>{{ chart_data.credits_timeline.used_data[i] or 0 }}</td>
+                        <td>
+                            {% if chart_data.credits_timeline.total_data[i] and chart_data.credits_timeline.total_data[i] > 0 %}
+                                {{ "%.1f"|format((chart_data.credits_timeline.used_data[i] or 0) * 100 / chart_data.credits_timeline.total_data[i]) }}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+
+        <script>
+            function toggleCustomDates() {
+                const periodSelect = document.querySelector('select[name="period"]');
+                const startDateGroup = document.getElementById('start-date-group');
+                const endDateGroup = document.getElementById('end-date-group');
+                
+                if (periodSelect.value === 'custom') {
+                    startDateGroup.style.display = 'block';
+                    endDateGroup.style.display = 'block';
+                } else {
+                    startDateGroup.style.display = 'none';
+                    endDateGroup.style.display = 'none';
+                }
+            }
+        </script>
+    </main>
+</div>
+{% endblock %}

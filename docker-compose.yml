@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # Aplicação Next.js
+  app:
+    build: .
+    container_name: mikrotik-manager-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - .:/app
+      - ./uploads:/app/uploads
+      - ./backups:/app/backups
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mikrotik-network
+
+  # Banco de Dados PostgreSQL
+  postgres:
+    image: postgres:15
+    container_name: mikrotik-manager-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=mikrotik_manager
+      - POSTGRES_USER=mikrotik
+      - POSTGRES_PASSWORD=mikrotik123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-database.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - mikrotik-network
+
+  # Redis para Cache e Sessões
+  redis:
+    image: redis:7-alpine
+    container_name: mikrotik-manager-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis123}
+    volumes:
+      - redis_data:/data
+    networks:
+      - mikrotik-network
+
+  # Nginx Proxy Reverso
+  nginx:
+    image: nginx:alpine
+    container_name: mikrotik-manager-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - mikrotik-network
+
+  # Prometheus para Monitoramento
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mikrotik-manager-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - mikrotik-network
+
+  # Grafana para Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mikrotik-manager-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - mikrotik-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  mikrotik-network:
+    driver: bridge
