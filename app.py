@@ -1,48 +1,38 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_from_directory
-import os
-import json
-from datetime import datetime, timedelta
-import hashlib
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 import sqlite3
-import uuid
-from werkzeug.utils import secure_filename
-from PIL import Image
-import socket
+import hashlib
 import paramiko
-import time
 import re
 import threading
-from threading import Timer
+import time
+from datetime import datetime, timedelta
+import os
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = 'mikrotik-manager-super-secret-key-2024'
+app.secret_key = 'your-secret-key-here'
 
 # Configurações
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+DATABASE = 'mikrotik_manager.db'
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
-# Criar pasta de uploads se não existir
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-# Variável global para controlar a coleta automática
+# Variável global para controle da coleta automática
+auto_collect_thread = None
 auto_collect_running = False
-collect_timer = None
 
-# Inicializar banco de dados SQLite
 def init_db():
-    conn = sqlite3.connect('mikrotik_manager.db')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     
     # Tabela de usuários do sistema
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS system_users (
-            id TEXT PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            name TEXT NOT NULL,
             role TEXT DEFAULT 'user',
-            active INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -50,14 +40,13 @@ def init_db():
     # Tabela de empresas
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS companies (
-            id TEXT PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             mikrotik_ip TEXT NOT NULL,
-            mikrotik_port INTEGER DEFAULT 8728,
+            mikrotik_port INTEGER DEFAULT 22,
             mikrotik_user TEXT NOT NULL,
             mikrotik_password TEXT NOT NULL,
             turma_ativa TEXT DEFAULT 'A',
-            active INTEGER DEFAULT 1,
             connection_status TEXT DEFAULT 'disconnected',
             last_connection_test TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -67,13 +56,14 @@ def init_db():
     # Tabela de perfis hotspot
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS hotspot_profiles (
-            id TEXT PRIMARY KEY,
-            company_id TEXT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            download_limit INTEGER NOT NULL,
-            upload_limit INTEGER NOT NULL,
-            time_limit INTEGER,
-            active INTEGER DEFAULT 1,
+            rate_limit TEXT,
+            session_timeout INTEGER,
+            idle_timeout INTEGER,
+            shared_users INTEGER DEFAULT 1,
+            is_default BOOLEAN DEFAULT 0,
+            company_id INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES companies (id)
         )
@@ -82,298 +72,197 @@ def init_db():
     # Tabela de usuários hotspot
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS hotspot_users (
-            id TEXT PRIMARY KEY,
-            company_id TEXT,
-            profile_id TEXT,
-            username TEXT NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
             password TEXT NOT NULL,
-            email TEXT,
-            full_name TEXT,
-            phone TEXT,
+            profile_id INTEGER,
+            company_id INTEGER NOT NULL,
             turma TEXT DEFAULT 'A',
-            active INTEGER DEFAULT 1,
+            status TEXT DEFAULT 'active',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (company_id) REFERENCES companies (id),
-            FOREIGN KEY (profile_id) REFERENCES hotspot_profiles (id)
+            FOREIGN KEY (profile_id) REFERENCES hotspot_profiles (id),
+            FOREIGN KEY (company_id) REFERENCES companies (id)
         )
     ''')
     
-    # Tabela de créditos (em MB)
+    # Tabela de créditos
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_credits (
-            id TEXT PRIMARY KEY,
-            hotspot_user_id TEXT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            company_id INTEGER NOT NULL,
             total_mb INTEGER DEFAULT 0,
             used_mb INTEGER DEFAULT 0,
             remaining_mb INTEGER DEFAULT 0,
-            last_reset DATE,
+            month INTEGER NOT NULL,
+            year INTEGER NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (hotspot_user_id) REFERENCES hotspot_users (id)
+            FOREIGN KEY (user_id) REFERENCES hotspot_users (id),
+            FOREIGN KEY (company_id) REFERENCES companies (id)
+        )
+    ''')
+    
+    # Tabela de logs MikroTik
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mikrotik_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            details TEXT,
+            status TEXT DEFAULT 'success',
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES companies (id)
         )
     ''')
     
     # Tabela de configurações
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS system_settings (
-            id TEXT PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             key TEXT UNIQUE NOT NULL,
             value TEXT,
-            description TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
-    # Tabela de logs de conexão MikroTik
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS mikrotik_connection_logs (
-            id TEXT PRIMARY KEY,
-            company_id TEXT,
-            action TEXT NOT NULL,
-            status TEXT NOT NULL,
-            message TEXT,
-            response_time REAL,
-            ip_address TEXT,
-            port INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (company_id) REFERENCES companies (id)
-        )
-    ''')
-    
-    # Inserir usuário admin padrão
-    cursor.execute('''
-        INSERT OR IGNORE INTO system_users (id, email, password, name, role)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (str(uuid.uuid4()), 'admin@demo.com', 'admin123', 'Administrador Sistema', 'admin'))
     
     # Inserir configurações padrão
-    settings = [
-        ('default_credit_mb', '1024', 'Crédito padrão em MB para novos usuários'),
-        ('credit_reset_time', '00:00', 'Horário de reset dos créditos diários'),
-        ('enable_cumulative', '1', 'Habilitar créditos cumulativos'),
-        ('system_timezone', 'America/Sao_Paulo', 'Timezone do sistema'),
-        ('system_name', 'MikroTik Manager', 'Nome do sistema'),
-        ('system_logo', '', 'Logo do sistema'),
-        ('auto_collect_usage', '1', 'Coleta automática de uso a cada minuto')
-    ]
+    cursor.execute('''
+        INSERT OR IGNORE INTO settings (key, value) VALUES 
+        ('system_name', 'MikroTik Manager'),
+        ('system_logo', ''),
+        ('auto_collect_usage', 'true')
+    ''')
     
-    for key, value, desc in settings:
-        cursor.execute('''
-            INSERT OR IGNORE INTO system_settings (id, key, value, description)
-            VALUES (?, ?, ?, ?)
-        ''', (str(uuid.uuid4()), key, value, desc))
+    # Criar usuário admin padrão
+    admin_password = hashlib.sha256('admin123'.encode()).hexdigest()
+    cursor.execute('''
+        INSERT OR IGNORE INTO users (name, email, password, role) 
+        VALUES ('Administrador', 'admin@admin.com', ?, 'admin')
+    ''', (admin_password,))
     
     conn.commit()
     conn.close()
 
-def get_db():
-    conn = sqlite3.connect('mikrotik_manager.db')
+def get_db_connection():
+    conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
-def check_auth():
-    """Verifica se o usuário está autenticado"""
-    return 'user_id' in session and 'email' in session
-
-def require_auth(f):
-    """Decorator para rotas que requerem autenticação"""
-    def decorated_function(*args, **kwargs):
-        if not check_auth():
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    decorated_function.__name__ = f.__name__
-    return decorated_function
-
-def get_setting(key, default=None):
-    """Busca uma configuração do sistema"""
-    conn = get_db()
-    setting = conn.execute('SELECT value FROM system_settings WHERE key = ?', (key,)).fetchone()
-    conn.close()
-    return setting['value'] if setting else default
-
-def allowed_file(filename):
-    """Verifica se o arquivo é permitido"""
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'svg'}
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def resize_image(image_path, size=(64, 64)):
-    """Redimensiona imagem mantendo proporção"""
-    try:
-        with Image.open(image_path) as img:
-            # Converter para RGB se necessário
-            if img.mode in ('RGBA', 'LA', 'P'):
-                img = img.convert('RGB')
-            
-            # Redimensionar mantendo proporção
-            img.thumbnail(size, Image.Resampling.LANCZOS)
-            
-            # Criar nova imagem com fundo branco
-            new_img = Image.new('RGB', size, (255, 255, 255))
-            
-            # Centralizar a imagem redimensionada
-            x = (size[0] - img.width) // 2
-            y = (size[1] - img.height) // 2
-            new_img.paste(img, (x, y))
-            
-            # Salvar
-            new_img.save(image_path, 'PNG', quality=95)
-            return True
-    except Exception as e:
-        print(f"Erro ao redimensionar imagem: {e}")
-        return False
-
-def log_mikrotik_connection(company_id, action, status, message, response_time=None, ip_address=None, port=None):
-    """Registra log de conexão com MikroTik"""
-    conn = get_db()
+def log_mikrotik_action(company_id, action, details, status='success'):
+    """Registra ações do MikroTik nos logs"""
+    conn = get_db_connection()
     conn.execute('''
-        INSERT INTO mikrotik_connection_logs (id, company_id, action, status, message, response_time, ip_address, port)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (str(uuid.uuid4()), company_id, action, status, message, response_time, ip_address, port))
+        INSERT INTO mikrotik_logs (company_id, action, details, status)
+        VALUES (?, ?, ?, ?)
+    ''', (company_id, action, details, status))
     conn.commit()
     conn.close()
 
-def parse_usage_from_comment(comment):
-    """Extrai o total de uso em MB do campo comment"""
-    if not comment:
-        return 0
-    
+def connect_mikrotik(ip, port, username, password):
+    """Conecta ao MikroTik via SSH"""
     try:
-        # Procurar por padrões como "1024MB", "1.5GB", "512 MB", etc.
-        # Primeiro tentar MB
-        mb_match = re.search(r'(\d+(?:\.\d+)?)\s*MB', comment, re.IGNORECASE)
-        if mb_match:
-            return int(float(mb_match.group(1)))
-        
-        # Tentar GB
-        gb_match = re.search(r'(\d+(?:\.\d+)?)\s*GB', comment, re.IGNORECASE)
-        if gb_match:
-            return int(float(gb_match.group(1)) * 1024)
-        
-        # Tentar KB
-        kb_match = re.search(r'(\d+(?:\.\d+)?)\s*KB', comment, re.IGNORECASE)
-        if kb_match:
-            return int(float(kb_match.group(1)) / 1024)
-        
-        # Tentar apenas números (assumir MB)
-        num_match = re.search(r'(\d+(?:\.\d+)?)', comment)
-        if num_match:
-            return int(float(num_match.group(1)))
-            
-    except (ValueError, AttributeError):
-        pass
-    
-    return 0
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(ip, port=port, username=username, password=password, timeout=10)
+        return ssh
+    except Exception as e:
+        return None
 
 def collect_user_usage_from_mikrotik(company_id):
-    """Coleta o uso dos usuários do MikroTik via comment"""
-    conn = get_db()
+    """Coleta dados de uso dos usuários do MikroTik via comment"""
+    conn = get_db_connection()
     company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
     
     if not company:
         conn.close()
-        return False, 'Empresa não encontrada'
-    
-    start_time = time.time()
+        return False, "Empresa não encontrada"
     
     try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # Conectar ao MikroTik
+        ssh = connect_mikrotik(company['mikrotik_ip'], company['mikrotik_port'], 
+                             company['mikrotik_user'], company['mikrotik_password'])
         
-        ssh.connect(
-            hostname=company['mikrotik_ip'],
-            port=int(company['mikrotik_port']),
-            username=company['mikrotik_user'],
-            password=company['mikrotik_password'],
-            timeout=10
-        )
+        if not ssh:
+            log_mikrotik_action(company_id, 'collect_usage', 'Falha na conexão SSH', 'error')
+            conn.close()
+            return False, "Falha na conexão SSH"
         
-        # Executar comando para listar usuários hotspot com detalhes
+        # Executar comando para listar usuários hotspot com comments
         stdin, stdout, stderr = ssh.exec_command('/ip hotspot user print detail')
         output = stdout.read().decode('utf-8')
-        error = stderr.read().decode('utf-8')
-        
         ssh.close()
         
-        if error:
-            response_time = time.time() - start_time
-            log_mikrotik_connection(
-                company_id, 'collect_usage', 'failed', 
-                f'Erro ao coletar uso: {error}', 
-                response_time, company['mikrotik_ip'], company['mikrotik_port']
-            )
-            conn.close()
-            return False, f'Erro ao coletar uso: {error}'
-        
-        # Fazer parsing da saída para extrair usage dos comments
-        users_usage = parse_mikrotik_users_usage(output)
-        
+        # Parse dos usuários e seus dados de uso
+        users_data = parse_mikrotik_users_usage(output)
         updated_count = 0
         
-        for user_data in users_usage:
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        
+        for user_data in users_data:
             username = user_data.get('name', '')
             comment = user_data.get('comment', '')
-            used_mb = parse_usage_from_comment(comment)
             
             if not username:
                 continue
             
             # Buscar usuário no sistema
             user = conn.execute('''
-                SELECT hu.id, uc.id as credit_id, uc.total_mb 
-                FROM hotspot_users hu
-                LEFT JOIN user_credits uc ON hu.id = uc.hotspot_user_id
-                WHERE hu.username = ? AND hu.company_id = ?
+                SELECT id FROM hotspot_users 
+                WHERE name = ? AND company_id = ?
             ''', (username, company_id)).fetchone()
             
-            if user:
-                # Calcular remaining_mb
-                remaining_mb = max(0, user['total_mb'] - used_mb)
-                
-                # Atualizar créditos do usuário
-                if user['credit_id']:
-                    conn.execute('''
-                        UPDATE user_credits 
-                        SET used_mb = ?, remaining_mb = ?, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = ?
-                    ''', (used_mb, remaining_mb, user['credit_id']))
-                else:
-                    # Criar registro de crédito se não existir
-                    default_credit = int(get_setting('default_credit_mb', 1024))
-                    remaining_mb = max(0, default_credit - used_mb)
-                    conn.execute('''
-                        INSERT INTO user_credits (id, hotspot_user_id, total_mb, used_mb, remaining_mb, last_reset)
-                        VALUES (?, ?, ?, ?, ?, DATE('now'))
-                    ''', (str(uuid.uuid4()), user['id'], default_credit, used_mb, remaining_mb))
-                
-                updated_count += 1
+            if not user:
+                continue
+            
+            # Extrair dados de uso do comment
+            used_mb = parse_usage_from_comment(comment)
+            
+            if used_mb is None:
+                continue
+            
+            # Buscar ou criar registro de crédito
+            credit = conn.execute('''
+                SELECT * FROM user_credits 
+                WHERE user_id = ? AND company_id = ? AND month = ? AND year = ?
+            ''', (user['id'], company_id, current_month, current_year)).fetchone()
+            
+            if credit:
+                # Atualizar registro existente
+                remaining_mb = max(0, credit['total_mb'] - used_mb)
+                conn.execute('''
+                    UPDATE user_credits 
+                    SET used_mb = ?, remaining_mb = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (used_mb, remaining_mb, credit['id']))
+            else:
+                # Criar novo registro (assumindo 1000MB como padrão)
+                total_mb = 1000
+                remaining_mb = max(0, total_mb - used_mb)
+                conn.execute('''
+                    INSERT INTO user_credits (user_id, company_id, total_mb, used_mb, remaining_mb, month, year)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (user['id'], company_id, total_mb, used_mb, remaining_mb, current_month, current_year))
+            
+            updated_count += 1
         
         conn.commit()
+        
+        # Log da operação
+        log_mikrotik_action(company_id, 'collect_usage', 
+                          f'Coletados dados de uso de {updated_count} usuários', 'success')
+        
         conn.close()
-        
-        response_time = time.time() - start_time
-        message = f'Coletado uso de {updated_count} usuários'
-        
-        log_mikrotik_connection(
-            company_id, 'collect_usage', 'success', 
-            message, response_time, company['mikrotik_ip'], company['mikrotik_port']
-        )
-        
-        return True, message
+        return True, f"Dados de uso coletados para {updated_count} usuários"
         
     except Exception as e:
-        response_time = time.time() - start_time
-        error_message = f'Erro na coleta de uso: {str(e)}'
-        
-        log_mikrotik_connection(
-            company_id, 'collect_usage', 'failed', 
-            error_message, response_time, company['mikrotik_ip'], company['mikrotik_port']
-        )
-        
+        log_mikrotik_action(company_id, 'collect_usage', f'Erro: {str(e)}', 'error')
         conn.close()
-        return False, error_message
+        return False, f"Erro na coleta: {str(e)}"
 
 def parse_mikrotik_users_usage(output):
-    """Faz parsing da saída do comando /ip hotspot user print detail para extrair usage"""
+    """Parse da saída do comando MikroTik para extrair usuários e comments"""
     users = []
     current_user = {}
     
@@ -382,22 +271,19 @@ def parse_mikrotik_users_usage(output):
     for line in lines:
         line = line.strip()
         
-        # Nova entrada de usuário (começa com número)
-        if re.match(r'^\d+', line):
+        if line.startswith('name='):
+            # Novo usuário encontrado
             if current_user:
                 users.append(current_user)
             current_user = {}
-            continue
-        
-        # Parsing dos campos usando regex para extrair valores corretos
-        if 'name=' in line:
-            # Extrair nome: name="valor" ou name=valor
+            
+            # Extrair nome
             name_match = re.search(r'name=(?:"([^"]+)"|([^\s]+))', line)
             if name_match:
                 current_user['name'] = name_match.group(1) or name_match.group(2)
         
-        if 'comment=' in line:
-            # Extrair comment: comment="valor" ou comment=valor
+        elif 'comment=' in line and current_user:
+            # Extrair comment
             comment_match = re.search(r'comment=(?:"([^"]+)"|([^\s]+))', line)
             if comment_match:
                 current_user['comment'] = comment_match.group(1) or comment_match.group(2)
@@ -408,567 +294,102 @@ def parse_mikrotik_users_usage(output):
     
     return users
 
-def collect_all_companies_usage():
-    """Coleta uso de todas as empresas ativas"""
-    conn = get_db()
-    companies = conn.execute('SELECT id FROM companies WHERE active = 1').fetchall()
-    conn.close()
+def parse_usage_from_comment(comment):
+    """Extrai dados de uso em MB do comment"""
+    if not comment:
+        return None
     
-    total_updated = 0
-    for company in companies:
-        try:
-            success, message = collect_user_usage_from_mikrotik(company['id'])
-            if success:
-                # Extrair número de usuários atualizados da mensagem
-                match = re.search(r'(\d+)', message)
-                if match:
-                    total_updated += int(match.group(1))
-        except Exception as e:
-            print(f"Erro ao coletar uso da empresa {company['id']}: {e}")
+    # Procurar padrões como "1024MB", "1.5GB", "512KB"
+    patterns = [
+        r'(\d+(?:\.\d+)?)\s*MB',
+        r'(\d+(?:\.\d+)?)\s*GB',
+        r'(\d+(?:\.\d+)?)\s*KB',
+        r'(\d+(?:\.\d+)?)\s*mb',
+        r'(\d+(?:\.\d+)?)\s*gb',
+        r'(\d+(?:\.\d+)?)\s*kb'
+    ]
     
-    return total_updated
+    for pattern in patterns:
+        match = re.search(pattern, comment, re.IGNORECASE)
+        if match:
+            value = float(match.group(1))
+            unit = pattern.split('\\s*')[1].replace(')', '').upper()
+            
+            if 'GB' in unit:
+                return int(value * 1024)  # Converter GB para MB
+            elif 'KB' in unit:
+                return int(value / 1024)  # Converter KB para MB
+            else:  # MB
+                return int(value)
+    
+    return None
 
 def auto_collect_usage():
-    """Função para coleta automática de uso"""
-    global collect_timer, auto_collect_running
+    """Função para coleta automática de uso a cada 1 minuto"""
+    global auto_collect_running
     
-    if not auto_collect_running:
-        return
-    
-    try:
-        # Verificar se a coleta automática está habilitada
-        auto_collect_enabled = get_setting('auto_collect_usage', '1') == '1'
+    while auto_collect_running:
+        try:
+            # Verificar se a coleta automática está habilitada
+            conn = get_db_connection()
+            setting = conn.execute('SELECT value FROM settings WHERE key = ?', ('auto_collect_usage',)).fetchone()
+            
+            if setting and setting['value'] == 'true':
+                # Buscar todas as empresas
+                companies = conn.execute('SELECT id FROM companies').fetchall()
+                
+                for company in companies:
+                    collect_user_usage_from_mikrotik(company['id'])
+                    time.sleep(1)  # Pequena pausa entre empresas
+            
+            conn.close()
+            
+        except Exception as e:
+            print(f"Erro na coleta automática: {e}")
         
-        if auto_collect_enabled:
-            total_updated = collect_all_companies_usage()
-            print(f"Coleta automática: {total_updated} usuários atualizados - {datetime.now()}")
-    except Exception as e:
-        print(f"Erro na coleta automática: {e}")
-    
-    # Agendar próxima coleta em 1 minuto
-    if auto_collect_running:
-        collect_timer = Timer(60.0, auto_collect_usage)
-        collect_timer.start()
+        # Aguardar 60 segundos (1 minuto)
+        time.sleep(60)
 
 def start_auto_collect():
     """Inicia a coleta automática"""
-    global auto_collect_running, collect_timer
+    global auto_collect_thread, auto_collect_running
     
     if not auto_collect_running:
         auto_collect_running = True
-        collect_timer = Timer(60.0, auto_collect_usage)
-        collect_timer.start()
-        print("Coleta automática de uso iniciada (a cada 1 minuto)")
+        auto_collect_thread = threading.Thread(target=auto_collect_usage, daemon=True)
+        auto_collect_thread.start()
 
 def stop_auto_collect():
     """Para a coleta automática"""
-    global auto_collect_running, collect_timer
-    
+    global auto_collect_running
     auto_collect_running = False
-    if collect_timer:
-        collect_timer.cancel()
-        collect_timer = None
-        print("Coleta automática de uso parada")
 
-def test_mikrotik_connection(company_id, ip_address, port, username, password):
-    """Testa conexão com MikroTik via SSH"""
-    start_time = time.time()
-    
-    try:
-        # Testar conexão TCP primeiro
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(10)
-        result = sock.connect_ex((ip_address, int(port)))
-        sock.close()
-        
-        if result != 0:
-            response_time = time.time() - start_time
-            log_mikrotik_connection(
-                company_id, 'test_connection', 'failed', 
-                f'Porta {port} não está acessível', 
-                response_time, ip_address, port
-            )
-            return False, f'Porta {port} não está acessível'
-        
-        # Testar conexão SSH
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        ssh.connect(
-            hostname=ip_address,
-            port=int(port),
-            username=username,
-            password=password,
-            timeout=10
-        )
-        
-        # Executar comando simples para verificar se está funcionando
-        stdin, stdout, stderr = ssh.exec_command('/system identity print')
-        output = stdout.read().decode('utf-8')
-        error = stderr.read().decode('utf-8')
-        
-        ssh.close()
-        
-        response_time = time.time() - start_time
-        
-        if error:
-            log_mikrotik_connection(
-                company_id, 'test_connection', 'failed', 
-                f'Erro na execução do comando: {error}', 
-                response_time, ip_address, port
-            )
-            return False, f'Erro na execução do comando: {error}'
-        
-        log_mikrotik_connection(
-            company_id, 'test_connection', 'success', 
-            'Conexão estabelecida com sucesso', 
-            response_time, ip_address, port
-        )
-        
-        # Atualizar status da empresa
-        conn = get_db()
-        conn.execute('''
-            UPDATE companies 
-            SET connection_status = 'connected', last_connection_test = CURRENT_TIMESTAMP
-            WHERE id = ?
-        ''', (company_id,))
-        conn.commit()
-        conn.close()
-        
-        return True, 'Conexão estabelecida com sucesso'
-        
-    except paramiko.AuthenticationException:
-        response_time = time.time() - start_time
-        log_mikrotik_connection(
-            company_id, 'test_connection', 'failed', 
-            'Falha na autenticação - usuário ou senha incorretos', 
-            response_time, ip_address, port
-        )
-        return False, 'Falha na autenticação - usuário ou senha incorretos'
-        
-    except paramiko.SSHException as e:
-        response_time = time.time() - start_time
-        log_mikrotik_connection(
-            company_id, 'test_connection', 'failed', 
-            f'Erro SSH: {str(e)}', 
-            response_time, ip_address, port
-        )
-        return False, f'Erro SSH: {str(e)}'
-        
-    except socket.timeout:
-        response_time = time.time() - start_time
-        log_mikrotik_connection(
-            company_id, 'test_connection', 'failed', 
-            'Timeout na conexão', 
-            response_time, ip_address, port
-        )
-        return False, 'Timeout na conexão'
-        
-    except Exception as e:
-        response_time = time.time() - start_time
-        log_mikrotik_connection(
-            company_id, 'test_connection', 'failed', 
-            f'Erro inesperado: {str(e)}', 
-            response_time, ip_address, port
-        )
-        return False, f'Erro inesperado: {str(e)}'
-
-def create_mikrotik_profile(company_id, profile_name, download_limit, upload_limit, time_limit=None):
-    """Cria perfil no MikroTik"""
-    conn = get_db()
-    company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
-    conn.close()
-    
-    if not company:
-        return False, 'Empresa não encontrada'
-    
-    start_time = time.time()
-    
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        ssh.connect(
-            hostname=company['mikrotik_ip'],
-            port=int(company['mikrotik_port']),
-            username=company['mikrotik_user'],
-            password=company['mikrotik_password'],
-            timeout=10
-        )
-        
-        # Construir comando para criar perfil
-        rate_limit = f"{upload_limit}M/{download_limit}M"
-        command = f'/ip hotspot user profile add name="{profile_name}" rate-limit="{rate_limit}"'
-        
-        # Adicionar limite de tempo se especificado
-        if time_limit:
-            command += f' session-timeout="{time_limit}m"'
-        
-        stdin, stdout, stderr = ssh.exec_command(command)
-        error = stderr.read().decode('utf-8')
-        
-        ssh.close()
-        
-        response_time = time.time() - start_time
-        
-        if error and 'already exists' not in error:
-            log_mikrotik_connection(
-                company_id, 'create_profile', 'failed', 
-                f'Erro ao criar perfil {profile_name}: {error}', 
-                response_time, company['mikrotik_ip'], company['mikrotik_port']
-            )
-            return False, f'Erro ao criar perfil: {error}'
-        
-        message = f'Perfil {profile_name} criado com sucesso'
-        if 'already exists' in error:
-            message = f'Perfil {profile_name} já existe no MikroTik'
-        
-        log_mikrotik_connection(
-            company_id, 'create_profile', 'success', 
-            message, response_time, company['mikrotik_ip'], company['mikrotik_port']
-        )
-        
-        return True, message
-        
-    except Exception as e:
-        response_time = time.time() - start_time
-        error_message = f'Erro ao criar perfil {profile_name}: {str(e)}'
-        
-        log_mikrotik_connection(
-            company_id, 'create_profile', 'failed', 
-            error_message, response_time, company['mikrotik_ip'], company['mikrotik_port']
-        )
-        
-        return False, error_message
-
-def import_mikrotik_users(company_id):
-    """Importa usuários hotspot do MikroTik para o sistema"""
-    conn = get_db()
-    company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
-    
-    if not company:
-        return False, 'Empresa não encontrada'
-    
-    start_time = time.time()
-    
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        ssh.connect(
-            hostname=company['mikrotik_ip'],
-            port=int(company['mikrotik_port']),
-            username=company['mikrotik_user'],
-            password=company['mikrotik_password'],
-            timeout=10
-        )
-        
-        # Executar comando para listar usuários hotspot
-        stdin, stdout, stderr = ssh.exec_command('/ip hotspot user print detail')
-        output = stdout.read().decode('utf-8')
-        error = stderr.read().decode('utf-8')
-        
-        ssh.close()
-        
-        if error:
-            response_time = time.time() - start_time
-            log_mikrotik_connection(
-                company_id, 'import_users', 'failed', 
-                f'Erro ao listar usuários: {error}', 
-                response_time, company['mikrotik_ip'], company['mikrotik_port']
-            )
-            return False, f'Erro ao listar usuários: {error}'
-        
-        # Fazer parsing da saída
-        users_data = parse_mikrotik_users(output)
-        
-        imported_count = 0
-        skipped_count = 0
-        default_credit = int(get_setting('default_credit_mb', 1024))
-        
-        for user_data in users_data:
-            username = user_data.get('name', '')
-            password = user_data.get('password', 'imported123')  # Senha padrão para importados
-            profile_name = user_data.get('profile', 'default')
-            disabled = user_data.get('disabled', 'false') == 'true'
-            
-            if not username:
-                continue
-            
-            # Verificar se usuário já existe
-            existing_user = conn.execute(
-                'SELECT id FROM hotspot_users WHERE username = ? AND company_id = ?', 
-                (username, company_id)
-            ).fetchone()
-            
-            if existing_user:
-                skipped_count += 1
-                continue
-            
-            # Buscar perfil no sistema (se existir)
-            profile_id = None
-            if profile_name != 'default':
-                profile = conn.execute(
-                    'SELECT id FROM hotspot_profiles WHERE name = ? AND company_id = ?', 
-                    (profile_name, company_id)
-                ).fetchone()
-                if profile:
-                    profile_id = profile['id']
-            
-            # Inserir usuário
-            user_id = str(uuid.uuid4())
-            user_active = 0 if disabled else 1
-            
-            conn.execute('''
-                INSERT INTO hotspot_users (id, company_id, profile_id, username, password, turma, active)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (user_id, company_id, profile_id, username, password, company['turma_ativa'], user_active))
-            
-            # Criar crédito inicial
-            conn.execute('''
-                INSERT INTO user_credits (id, hotspot_user_id, total_mb, remaining_mb, last_reset)
-                VALUES (?, ?, ?, ?, DATE('now'))
-            ''', (str(uuid.uuid4()), user_id, default_credit, default_credit))
-            
-            imported_count += 1
-        
-        conn.commit()
-        conn.close()
-        
-        response_time = time.time() - start_time
-        message = f'Importados {imported_count} usuários, {skipped_count} já existiam'
-        
-        log_mikrotik_connection(
-            company_id, 'import_users', 'success', 
-            message, response_time, company['mikrotik_ip'], company['mikrotik_port']
-        )
-        
-        return True, message
-        
-    except Exception as e:
-        response_time = time.time() - start_time
-        error_message = f'Erro na importação: {str(e)}'
-        
-        log_mikrotik_connection(
-            company_id, 'import_users', 'failed', 
-            error_message, response_time, company['mikrotik_ip'], company['mikrotik_port']
-        )
-        
-        return False, error_message
-
-def parse_mikrotik_users(output):
-    """Faz parsing da saída do comando /ip hotspot user print detail"""
-    users = []
-    current_user = {}
-    
-    lines = output.split('\n')
-    
-    for line in lines:
-        line = line.strip()
-        
-        # Nova entrada de usuário (começa com número)
-        if re.match(r'^\d+', line):
-            if current_user:
-                users.append(current_user)
-            current_user = {}
-            continue
-        
-        # Parsing dos campos usando regex para extrair valores corretos
-        if 'name=' in line:
-            # Extrair nome: name="valor" ou name=valor
-            name_match = re.search(r'name=(?:"([^"]+)"|([^\s]+))', line)
-            if name_match:
-                current_user['name'] = name_match.group(1) or name_match.group(2)
-        
-        if 'password=' in line:
-            # Extrair senha: password="valor" ou password=valor
-            password_match = re.search(r'password=(?:"([^"]+)"|([^\s]+))', line)
-            if password_match:
-                current_user['password'] = password_match.group(1) or password_match.group(2)
-        
-        if 'profile=' in line:
-            # Extrair perfil: profile="valor" ou profile=valor
-            profile_match = re.search(r'profile=(?:"([^"]+)"|([^\s]+))', line)
-            if profile_match:
-                current_user['profile'] = profile_match.group(1) or profile_match.group(2)
-        
-        if 'disabled=' in line:
-            # Extrair status disabled: disabled=true ou disabled=false
-            disabled_match = re.search(r'disabled=([^\s]+)', line)
-            if disabled_match:
-                current_user['disabled'] = disabled_match.group(1)
-    
-    # Adicionar último usuário
-    if current_user:
-        users.append(current_user)
-    
-    return users
-
-def sync_hotspot_users_to_mikrotik(company_id):
-    """Sincroniza usuários hotspot com o MikroTik"""
-    conn = get_db()
-    
-    # Buscar dados da empresa
-    company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
-    if not company:
-        return False, 'Empresa não encontrada'
-    
-    # Buscar usuários ativos da turma ativa com seus perfis
-    users = conn.execute('''
-        SELECT hu.*, hp.name as profile_name
-        FROM hotspot_users hu
-        LEFT JOIN hotspot_profiles hp ON hu.profile_id = hp.id
-        WHERE hu.company_id = ? AND hu.active = 1 AND hu.turma = ?
-    ''', (company_id, company['turma_ativa'])).fetchall()
-    
-    conn.close()
-    
-    start_time = time.time()
-    
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        ssh.connect(
-            hostname=company['mikrotik_ip'],
-            port=int(company['mikrotik_port']),
-            username=company['mikrotik_user'],
-            password=company['mikrotik_password'],
-            timeout=10
-        )
-        
-        synced_users = 0
-        
-        for user in users:
-            try:
-                # Usar o perfil do usuário ou "default" se não tiver perfil
-                profile_name = user['profile_name'] if user['profile_name'] else 'default'
-                
-                # Comando para adicionar/atualizar usuário no hotspot
-                command = f'/ip hotspot user add name="{user["username"]}" password="{user["password"]}" profile="{profile_name}"'
-                stdin, stdout, stderr = ssh.exec_command(command)
-                
-                error = stderr.read().decode('utf-8')
-                if not error or 'already exists' in error:
-                    synced_users += 1
-                    
-            except Exception as e:
-                print(f"Erro ao sincronizar usuário {user['username']}: {e}")
-        
-        ssh.close()
-        
-        response_time = time.time() - start_time
-        message = f'Sincronizados {synced_users} usuários com sucesso'
-        
-        log_mikrotik_connection(
-            company_id, 'sync_users', 'success', 
-            message, response_time, company['mikrotik_ip'], company['mikrotik_port']
-        )
-        
-        return True, message
-        
-    except Exception as e:
-        response_time = time.time() - start_time
-        error_message = f'Erro na sincronização: {str(e)}'
-        
-        log_mikrotik_connection(
-            company_id, 'sync_users', 'failed', 
-            error_message, response_time, company['mikrotik_ip'], company['mikrotik_port']
-        )
-        
-        return False, error_message
-
-def update_credits_cumulative():
-    """Atualiza créditos cumulativos diariamente"""
-    conn = get_db()
-    default_credit = int(get_setting('default_credit_mb', 1024))
-    enable_cumulative = get_setting('enable_cumulative', '1') == '1'
-    
-    if enable_cumulative:
-        # Adiciona crédito diário aos usuários ativos
-        conn.execute('''
-            UPDATE user_credits 
-            SET total_mb = total_mb + ?, 
-                remaining_mb = remaining_mb + ?,
-                last_reset = DATE('now'),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE hotspot_user_id IN (
-                SELECT id FROM hotspot_users WHERE active = 1
-            )
-        ''', (default_credit, default_credit))
-    else:
-        # Reset diário sem acumular
-        conn.execute('''
-            UPDATE user_credits 
-            SET total_mb = ?, 
-                remaining_mb = ?,
-                used_mb = 0,
-                last_reset = DATE('now'),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE hotspot_user_id IN (
-                SELECT id FROM hotspot_users WHERE active = 1
-            )
-        ''', (default_credit, default_credit))
-    
-    conn.commit()
-    conn.close()
-
-def update_users_by_turma(company_id, turma_ativa):
-    """Ativa/desativa usuários baseado na turma ativa da empresa"""
-    conn = get_db()
-    
-    # Ativar usuários da turma ativa
-    conn.execute('''
-        UPDATE hotspot_users 
-        SET active = 1 
-        WHERE company_id = ? AND turma = ?
-    ''', (company_id, turma_ativa))
-    
-    # Desativar usuários da turma inativa
-    turma_inativa = 'B' if turma_ativa == 'A' else 'A'
-    conn.execute('''
-        UPDATE hotspot_users 
-        SET active = 0 
-        WHERE company_id = ? AND turma = ?
-    ''', (company_id, turma_inativa))
-    
-    conn.commit()
-    conn.close()
+# Middleware para verificar autenticação
+@app.before_request
+def require_login():
+    allowed_routes = ['login', 'static']
+    if request.endpoint not in allowed_routes and 'user_id' not in session:
+        return redirect(url_for('login'))
 
 @app.route('/')
 def index():
-    """Página inicial - redireciona para login ou dashboard"""
-    if check_auth():
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Página de login"""
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
-        password = request.form.get('password', '').strip()
+        email = request.form['email']
+        password = hashlib.sha256(request.form['password'].encode()).hexdigest()
         
-        if not email or not password:
-            flash('Email e senha são obrigatórios', 'error')
-            return render_template('login.html')
-        
-        conn = get_db()
-        user = conn.execute(
-            'SELECT * FROM system_users WHERE email = ? AND password = ? AND active = 1',
-            (email, password)
-        ).fetchone()
+        conn = get_db_connection()
+        user = conn.execute('SELECT * FROM users WHERE email = ? AND password = ?', 
+                          (email, password)).fetchone()
         conn.close()
         
         if user:
-            session.permanent = True
             session['user_id'] = user['id']
-            session['email'] = user['email']
-            session['name'] = user['name']
-            session['role'] = user['role']
-            session['login_time'] = datetime.now().isoformat()
-            
-            flash(f'Bem-vindo, {user["name"]}!', 'success')
+            session['user_name'] = user['name']
+            session['user_role'] = user['role']
             return redirect(url_for('dashboard'))
         else:
             flash('Email ou senha incorretos', 'error')
@@ -977,878 +398,227 @@ def login():
 
 @app.route('/logout')
 def logout():
-    """Logout do usuário"""
     session.clear()
-    flash('Logout realizado com sucesso', 'info')
     return redirect(url_for('login'))
 
 @app.route('/dashboard')
-@require_auth
 def dashboard():
-    """Dashboard principal"""
-    conn = get_db()
+    conn = get_db_connection()
     
-    # Estatísticas reais
+    # Estatísticas gerais
     stats = {
-        'total_users': conn.execute('SELECT COUNT(*) as count FROM hotspot_users WHERE active = 1').fetchone()['count'],
-        'active_companies': conn.execute('SELECT COUNT(*) as count FROM companies WHERE active = 1').fetchone()['count'],
-        'total_profiles': conn.execute('SELECT COUNT(*) as count FROM hotspot_profiles WHERE active = 1').fetchone()['count'],
-        'total_credits_mb': conn.execute('SELECT SUM(remaining_mb) as total FROM user_credits').fetchone()['total'] or 0
+        'total_companies': conn.execute('SELECT COUNT(*) as count FROM companies').fetchone()['count'],
+        'total_users': conn.execute('SELECT COUNT(*) as count FROM hotspot_users').fetchone()['count'],
+        'total_profiles': conn.execute('SELECT COUNT(*) as count FROM hotspot_profiles').fetchone()['count'],
+        'connected_companies': conn.execute("SELECT COUNT(*) as count FROM companies WHERE connection_status = 'connected'").fetchone()['count']
     }
     
-    # Atividades recentes
-    activities = conn.execute('''
-        SELECT 'user' as type, 'Novo usuário cadastrado' as title, 
-               full_name || ' - ' || datetime(created_at, 'localtime') as description
-        FROM hotspot_users 
-        WHERE active = 1 
+    # Empresas recentes
+    recent_companies = conn.execute('''
+        SELECT name, connection_status, last_connection_test 
+        FROM companies 
         ORDER BY created_at DESC 
         LIMIT 5
     ''').fetchall()
     
-    conn.close()
-    
-    user_data = {
-        'name': session.get('name'),
-        'email': session.get('email'),
-        'role': session.get('role')
-    }
-    
-    return render_template('dashboard.html', user=user_data, stats=stats, activities=activities)
-
-@app.route('/users', methods=['GET', 'POST'])
-@require_auth
-def users():
-    """Página de usuários do sistema"""
-    if request.method == 'POST':
-        name = request.form.get('name')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        role = request.form.get('role', 'user')
-        
-        if not all([name, email, password]):
-            flash('Todos os campos são obrigatórios', 'error')
-        else:
-            conn = get_db()
-            try:
-                conn.execute('''
-                    INSERT INTO system_users (id, email, password, name, role)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (str(uuid.uuid4()), email, password, name, role))
-                conn.commit()
-                flash('Usuário cadastrado com sucesso!', 'success')
-            except sqlite3.IntegrityError:
-                flash('Email já existe no sistema', 'error')
-            finally:
-                conn.close()
-        
-        return redirect(url_for('users'))
-    
-    # Buscar usuários
-    conn = get_db()
-    users_list = conn.execute('''
-        SELECT * FROM system_users 
-        WHERE active = 1 
-        ORDER BY created_at DESC
+    # Logs recentes
+    recent_logs = conn.execute('''
+        SELECT ml.action, ml.details, ml.timestamp, c.name as company_name
+        FROM mikrotik_logs ml
+        JOIN companies c ON ml.company_id = c.id
+        ORDER BY ml.timestamp DESC
+        LIMIT 10
     ''').fetchall()
+    
     conn.close()
     
-    return render_template('users.html', user={'name': session.get('name')}, users_list=users_list)
+    user = {'name': session.get('user_name', 'Usuário')}
+    
+    return render_template('dashboard.html', 
+                         stats=stats, 
+                         recent_companies=recent_companies,
+                         recent_logs=recent_logs,
+                         user=user)
 
 @app.route('/companies', methods=['GET', 'POST'])
-@require_auth
 def companies():
-    """Página de empresas"""
     if request.method == 'POST':
-        name = request.form.get('name')
-        mikrotik_ip = request.form.get('mikrotik_ip')
-        mikrotik_port = request.form.get('mikrotik_port', 22)
-        mikrotik_user = request.form.get('mikrotik_user')
-        mikrotik_password = request.form.get('mikrotik_password')
-        turma_ativa = request.form.get('turma_ativa', 'A')
+        name = request.form['name']
+        mikrotik_ip = request.form['mikrotik_ip']
+        mikrotik_port = int(request.form['mikrotik_port'])
+        mikrotik_user = request.form['mikrotik_user']
+        mikrotik_password = request.form['mikrotik_password']
+        turma_ativa = request.form['turma_ativa']
         
-        if not all([name, mikrotik_ip, mikrotik_user, mikrotik_password]):
-            flash('Todos os campos são obrigatórios', 'error')
-        else:
-            conn = get_db()
-            company_id = str(uuid.uuid4())
-            conn.execute('''
-                INSERT INTO companies (id, name, mikrotik_ip, mikrotik_port, mikrotik_user, mikrotik_password, turma_ativa)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (company_id, name, mikrotik_ip, int(mikrotik_port), mikrotik_user, mikrotik_password, turma_ativa))
-            conn.commit()
-            conn.close()
-            
-            # Testar conexão automaticamente
-            success, message = test_mikrotik_connection(company_id, mikrotik_ip, mikrotik_port, mikrotik_user, mikrotik_password)
-            
-            if success:
-                flash(f'Empresa cadastrada e conexão testada com sucesso!', 'success')
-            else:
-                flash(f'Empresa cadastrada, mas falha na conexão: {message}', 'warning')
-        
-        return redirect(url_for('companies'))
-    
-    # Buscar empresas
-    conn = get_db()
-    companies_list = conn.execute('''
-        SELECT *, 
-               (SELECT COUNT(*) FROM hotspot_users WHERE company_id = companies.id AND active = 1) as user_count
-        FROM companies
-        WHERE active = 1 
-        ORDER BY created_at DESC
-    ''').fetchall()
-    
-    # Buscar configurações atuais
-    current_settings = {}
-    settings_rows = conn.execute('SELECT key, value FROM system_settings').fetchall()
-    for row in settings_rows:
-        current_settings[row['key']] = row['value']
-    
-    conn.close()
-
-    return render_template('companies.html', 
-                         user={'name': session.get('name')}, 
-                         companies_list=companies_list,
-                         settings=current_settings)
-
-@app.route('/companies/<company_id>/edit', methods=['POST'])
-@require_auth
-def edit_company(company_id):
-    """Editar empresa"""
-    name = request.form.get('name')
-    mikrotik_ip = request.form.get('mikrotik_ip')
-    mikrotik_port = request.form.get('mikrotik_port', 22)
-    mikrotik_user = request.form.get('mikrotik_user')
-    mikrotik_password = request.form.get('mikrotik_password')
-    turma_ativa = request.form.get('turma_ativa', 'A')
-    
-    if not all([name, mikrotik_ip, mikrotik_user, mikrotik_password]):
-        flash('Todos os campos são obrigatórios', 'error')
-    else:
-        conn = get_db()
+        conn = get_db_connection()
         conn.execute('''
-            UPDATE companies 
-            SET name = ?, mikrotik_ip = ?, mikrotik_port = ?, mikrotik_user = ?, mikrotik_password = ?, turma_ativa = ?
-            WHERE id = ?
-        ''', (name, mikrotik_ip, int(mikrotik_port), mikrotik_user, mikrotik_password, turma_ativa, company_id))
+            INSERT INTO companies (name, mikrotik_ip, mikrotik_port, mikrotik_user, mikrotik_password, turma_ativa)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (name, mikrotik_ip, mikrotik_port, mikrotik_user, mikrotik_password, turma_ativa))
         conn.commit()
         conn.close()
         
-        flash('Empresa atualizada com sucesso!', 'success')
+        flash('Empresa cadastrada com sucesso!', 'success')
+        return redirect(url_for('companies'))
     
+    conn = get_db_connection()
+    companies_list = conn.execute('''
+        SELECT c.*, 
+               COUNT(hu.id) as user_count
+        FROM companies c
+        LEFT JOIN hotspot_users hu ON c.id = hu.company_id
+        GROUP BY c.id
+        ORDER BY c.name
+    ''').fetchall()
+    conn.close()
+    
+    user = {'name': session.get('user_name', 'Usuário')}
+    
+    return render_template('companies.html', companies_list=companies_list, user=user)
+
+@app.route('/companies/<int:company_id>/edit', methods=['POST'])
+def edit_company(company_id):
+    name = request.form['name']
+    mikrotik_ip = request.form['mikrotik_ip']
+    mikrotik_port = int(request.form['mikrotik_port'])
+    mikrotik_user = request.form['mikrotik_user']
+    mikrotik_password = request.form['mikrotik_password']
+    turma_ativa = request.form['turma_ativa']
+    
+    conn = get_db_connection()
+    conn.execute('''
+        UPDATE companies 
+        SET name = ?, mikrotik_ip = ?, mikrotik_port = ?, mikrotik_user = ?, mikrotik_password = ?, turma_ativa = ?
+        WHERE id = ?
+    ''', (name, mikrotik_ip, mikrotik_port, mikrotik_user, mikrotik_password, turma_ativa, company_id))
+    conn.commit()
+    conn.close()
+    
+    flash('Empresa atualizada com sucesso!', 'success')
     return redirect(url_for('companies'))
 
-@app.route('/companies/<company_id>/test-connection', methods=['POST'])
-@require_auth
+@app.route('/companies/<int:company_id>/test-connection', methods=['POST'])
 def test_company_connection(company_id):
-    """Testar conexão com MikroTik de uma empresa"""
-    conn = get_db()
+    conn = get_db_connection()
     company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
+    
+    if company:
+        ssh = connect_mikrotik(company['mikrotik_ip'], company['mikrotik_port'], 
+                             company['mikrotik_user'], company['mikrotik_password'])
+        
+        if ssh:
+            ssh.close()
+            conn.execute('''
+                UPDATE companies 
+                SET connection_status = 'connected', last_connection_test = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (company_id,))
+            conn.commit()
+            log_mikrotik_action(company_id, 'test_connection', 'Conexão bem-sucedida', 'success')
+            flash('Conexão testada com sucesso!', 'success')
+        else:
+            conn.execute('''
+                UPDATE companies 
+                SET connection_status = 'disconnected', last_connection_test = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (company_id,))
+            conn.commit()
+            log_mikrotik_action(company_id, 'test_connection', 'Falha na conexão', 'error')
+            flash('Falha na conexão com o MikroTik', 'error')
+    
     conn.close()
-    
-    if not company:
-        flash('Empresa não encontrada', 'error')
-        return redirect(url_for('companies'))
-    
-    success, message = test_mikrotik_connection(
-        company_id, 
-        company['mikrotik_ip'], 
-        company['mikrotik_port'], 
-        company['mikrotik_user'], 
-        company['mikrotik_password']
-    )
-    
-    if success:
-        flash(f'Conexão com {company["name"]}: {message}', 'success')
-    else:
-        flash(f'Falha na conexão com {company["name"]}: {message}', 'error')
-    
     return redirect(url_for('companies'))
 
-@app.route('/companies/<company_id>/sync-users', methods=['POST'])
-@require_auth
-def sync_company_users(company_id):
-    """Sincronizar usuários com MikroTik"""
-    conn = get_db()
-    company = conn.execute('SELECT name FROM companies WHERE id = ?', (company_id,)).fetchone()
-    conn.close()
-    
-    if not company:
-        flash('Empresa não encontrada', 'error')
-        return redirect(url_for('companies'))
-    
-    success, message = sync_hotspot_users_to_mikrotik(company_id)
-    
-    if success:
-        flash(f'Sincronização com {company["name"]}: {message}', 'success')
-    else:
-        flash(f'Falha na sincronização com {company["name"]}: {message}', 'error')
-    
-    return redirect(url_for('companies'))
-
-@app.route('/companies/<company_id>/import-users', methods=['POST'])
-@require_auth
-def import_company_users(company_id):
-    """Importar usuários do MikroTik"""
-    conn = get_db()
-    company = conn.execute('SELECT name FROM companies WHERE id = ?', (company_id,)).fetchone()
-    conn.close()
-    
-    if not company:
-        flash('Empresa não encontrada', 'error')
-        return redirect(url_for('companies'))
-    
-    success, message = import_mikrotik_users(company_id)
-    
-    if success:
-        flash(f'Importação de {company["name"]}: {message}', 'success')
-    else:
-        flash(f'Falha na importação de {company["name"]}: {message}', 'error')
-    
-    return redirect(url_for('companies'))
-
-@app.route('/companies/<company_id>/collect-usage', methods=['POST'])
-@require_auth
+@app.route('/companies/<int:company_id>/collect-usage', methods=['POST'])
 def collect_company_usage(company_id):
-    """Coletar uso dos usuários de uma empresa"""
-    conn = get_db()
-    company = conn.execute('SELECT name FROM companies WHERE id = ?', (company_id,)).fetchone()
-    conn.close()
-    
-    if not company:
-        flash('Empresa não encontrada', 'error')
-        return redirect(url_for('companies'))
-    
+    """Coleta dados de uso de uma empresa específica"""
     success, message = collect_user_usage_from_mikrotik(company_id)
     
     if success:
-        flash(f'Coleta de uso de {company["name"]}: {message}', 'success')
+        flash(message, 'success')
     else:
-        flash(f'Falha na coleta de uso de {company["name"]}: {message}', 'error')
+        flash(message, 'error')
     
     return redirect(url_for('companies'))
 
 @app.route('/collect-all-usage', methods=['POST'])
-@require_auth
 def collect_all_usage():
-    """Coletar uso de todas as empresas"""
-    try:
-        total_updated = collect_all_companies_usage()
-        flash(f'Coleta de uso concluída: {total_updated} usuários atualizados', 'success')
-    except Exception as e:
-        flash(f'Erro na coleta de uso: {str(e)}', 'error')
+    """Coleta dados de uso de todas as empresas"""
+    conn = get_db_connection()
+    companies = conn.execute('SELECT id, name FROM companies').fetchall()
+    conn.close()
     
-    return redirect(request.referrer or url_for('dashboard'))
-
-@app.route('/companies/update-turma', methods=['POST'])
-@require_auth
-def update_company_turma():
-    """Atualizar turma ativa da empresa"""
-    company_id = request.form.get('company_id')
-    turma_ativa = request.form.get('turma_ativa')
+    total_updated = 0
+    errors = []
     
-    if not all([company_id, turma_ativa]):
-        flash('Dados inválidos', 'error')
+    for company in companies:
+        success, message = collect_user_usage_from_mikrotik(company['id'])
+        if success:
+            # Extrair número de usuários atualizados da mensagem
+            import re
+            match = re.search(r'(\d+)', message)
+            if match:
+                total_updated += int(match.group(1))
+        else:
+            errors.append(f"{company['name']}: {message}")
+    
+    if errors:
+        flash(f"Coleta concluída com {len(errors)} erros. Total de usuários atualizados: {total_updated}", 'warning')
     else:
-        conn = get_db()
-        conn.execute('''
-            UPDATE companies 
-            SET turma_ativa = ? 
-            WHERE id = ?
-        ''', (turma_ativa, company_id))
-        conn.commit()
-        conn.close()
-        
-        # Atualizar status dos usuários baseado na nova turma ativa
-        update_users_by_turma(company_id, turma_ativa)
-        
-        # Sincronizar automaticamente com MikroTik
-        sync_hotspot_users_to_mikrotik(company_id)
-        
-        flash(f'Turma ativa atualizada para {turma_ativa} e sincronizada!', 'success')
+        flash(f"Coleta concluída com sucesso! Total de usuários atualizados: {total_updated}", 'success')
     
     return redirect(url_for('companies'))
 
-@app.route('/mikrotik-logs')
-@require_auth
-def mikrotik_logs():
-    """Página de logs de conexão MikroTik"""
-    # Obter filtros da URL
-    company_filter = request.args.get('company', '')
-    action_filter = request.args.get('action', '')
-    status_filter = request.args.get('status', '')
+@app.route('/companies/update-turma', methods=['POST'])
+def update_company_turma():
+    company_id = request.form['company_id']
+    turma_ativa = request.form['turma_ativa']
     
-    conn = get_db()
-    
-    # Construir query base
-    base_query = '''
-        SELECT ml.*, c.name as company_name
-        FROM mikrotik_connection_logs ml
-        JOIN companies c ON ml.company_id = c.id
-        WHERE 1=1
-    '''
-    
-    params = []
-    
-    # Aplicar filtros
-    if company_filter:
-        base_query += ' AND c.id = ?'
-        params.append(company_filter)
-    
-    if action_filter:
-        base_query += ' AND ml.action = ?'
-        params.append(action_filter)
-    
-    if status_filter:
-        base_query += ' AND ml.status = ?'
-        params.append(status_filter)
-    
-    base_query += ' ORDER BY ml.created_at DESC LIMIT 500'
-    
-    # Buscar logs
-    logs_list = conn.execute(base_query, params).fetchall()
-    
-    # Buscar empresas para o filtro
-    companies_list = conn.execute('SELECT * FROM companies WHERE active = 1 ORDER BY name').fetchall()
-    
-    # Estatísticas dos logs
-    stats = conn.execute('''
-        SELECT 
-            COUNT(*) as total_logs,
-            COUNT(CASE WHEN status = 'success' THEN 1 END) as success_count,
-            COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_count,
-            AVG(response_time) as avg_response_time
-        FROM mikrotik_connection_logs
-        WHERE created_at >= datetime('now', '-24 hours')
-    ''').fetchone()
-    
+    conn = get_db_connection()
+    conn.execute('UPDATE companies SET turma_ativa = ? WHERE id = ?', (turma_ativa, company_id))
+    conn.commit()
     conn.close()
     
-    return render_template('mikrotik_logs.html', 
-                         user={'name': session.get('name')},
-                         logs_list=logs_list,
-                         companies_list=companies_list,
-                         stats=stats,
-                         selected_company=company_filter,
-                         selected_action=action_filter,
-                         selected_status=status_filter)
+    flash('Turma ativa atualizada com sucesso!', 'success')
+    return redirect(url_for('companies'))
 
-@app.route('/profiles', methods=['GET', 'POST'])
-@require_auth
+# Outras rotas existentes...
+@app.route('/profiles')
 def profiles():
-    """Página de perfis hotspot"""
-    if request.method == 'POST':
-        company_id = request.form.get('company_id')
-        name = request.form.get('name')
-        download_limit = request.form.get('download_limit')
-        upload_limit = request.form.get('upload_limit')
-        time_limit = request.form.get('time_limit')
-        
-        if not all([company_id, name, download_limit, upload_limit]):
-            flash('Campos obrigatórios não preenchidos', 'error')
-        else:
-            conn = get_db()
-            profile_id = str(uuid.uuid4())
-            conn.execute('''
-                INSERT INTO hotspot_profiles (id, company_id, name, download_limit, upload_limit, time_limit)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (profile_id, company_id, name, int(download_limit), int(upload_limit), 
-                  int(time_limit) if time_limit else None))
-            conn.commit()
-            conn.close()
-            
-            # Criar perfil no MikroTik
-            success, message = create_mikrotik_profile(
-                company_id, name, int(download_limit), int(upload_limit), 
-                int(time_limit) if time_limit else None
-            )
-            
-            if success:
-                flash(f'Perfil criado no sistema e no MikroTik: {message}', 'success')
-            else:
-                flash(f'Perfil criado no sistema, mas erro no MikroTik: {message}', 'warning')
-        
-        return redirect(url_for('profiles'))
-    
-    conn = get_db()
-    profiles_list = conn.execute('''
-        SELECT p.*, c.name as company_name
-        FROM hotspot_profiles p
-        JOIN companies c ON p.company_id = c.id
-        WHERE p.active = 1
-        ORDER BY p.created_at DESC
-    ''').fetchall()
-    
-    companies_list = conn.execute('SELECT * FROM companies WHERE active = 1').fetchall()
-    conn.close()
-    
-    return render_template('profiles.html', 
-                         user={'name': session.get('name')}, 
-                         profiles_list=profiles_list,
-                         companies_list=companies_list)
+    user = {'name': session.get('user_name', 'Usuário')}
+    return render_template('profiles.html', user=user)
 
-@app.route('/hotspot-users', methods=['GET', 'POST'])
-@require_auth
+@app.route('/hotspot-users')
 def hotspot_users():
-    """Página de usuários hotspot"""
-    if request.method == 'POST':
-        company_id = request.form.get('company_id')
-        profile_id = request.form.get('profile_id')
-        username = request.form.get('username')
-        password = request.form.get('password')
-        full_name = request.form.get('full_name')
-        email = request.form.get('email')
-        phone = request.form.get('phone')
-        turma = request.form.get('turma', 'A')
-        
-        if not all([company_id, username, password]):
-            flash('Campos obrigatórios não preenchidos', 'error')
-        else:
-            conn = get_db()
-            try:
-                # Verificar turma ativa da empresa
-                company = conn.execute('SELECT turma_ativa FROM companies WHERE id = ?', (company_id,)).fetchone()
-                user_active = 1 if company and company['turma_ativa'] == turma else 0
-                
-                user_id = str(uuid.uuid4())
-                conn.execute('''
-                    INSERT INTO hotspot_users (id, company_id, profile_id, username, password, full_name, email, phone, turma, active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (user_id, company_id, profile_id, username, password, full_name, email, phone, turma, user_active))
-                
-                # Criar crédito inicial
-                default_credit = int(get_setting('default_credit_mb', 1024))
-                conn.execute('''
-                    INSERT INTO user_credits (id, hotspot_user_id, total_mb, remaining_mb, last_reset)
-                    VALUES (?, ?, ?, ?, DATE('now'))
-                ''', (str(uuid.uuid4()), user_id, default_credit, default_credit))
-                
-                conn.commit()
-                conn.close()
-                
-                # Sincronizar com MikroTik se usuário estiver ativo
-                if user_active:
-                    sync_hotspot_users_to_mikrotik(company_id)
-                
-                flash('Usuário hotspot criado com sucesso!', 'success')
-            except sqlite3.IntegrityError:
-                flash('Username já existe', 'error')
-            finally:
-                conn.close()
-        
-        return redirect(url_for('hotspot_users'))
-    
-    conn = get_db()
-    hotspot_users_list = conn.execute('''
-        SELECT hu.*, c.name as company_name, p.name as profile_name,
-               uc.total_mb, uc.used_mb, uc.remaining_mb
-        FROM hotspot_users hu
-        JOIN companies c ON hu.company_id = c.id
-        LEFT JOIN hotspot_profiles p ON hu.profile_id = p.id
-        LEFT JOIN user_credits uc ON hu.id = uc.hotspot_user_id
-        ORDER BY hu.created_at DESC
-    ''').fetchall()
-    
-    companies_list = conn.execute('SELECT * FROM companies WHERE active = 1').fetchall()
-    profiles_list = conn.execute('SELECT * FROM hotspot_profiles WHERE active = 1').fetchall()
-    conn.close()
-    
-    return render_template('hotspot_users.html', 
-                         user={'name': session.get('name')}, 
-                         hotspot_users_list=hotspot_users_list,
-                         companies_list=companies_list,
-                         profiles_list=profiles_list)
-
-@app.route('/hotspot-users/edit', methods=['POST'])
-@require_auth
-def edit_hotspot_user():
-    """Editar usuário hotspot"""
-    user_id = request.form.get('user_id')
-    company_id = request.form.get('company_id')
-    profile_id = request.form.get('profile_id')
-    username = request.form.get('username')
-    password = request.form.get('password')
-    full_name = request.form.get('full_name')
-    email = request.form.get('email')
-    phone = request.form.get('phone')
-    turma = request.form.get('turma', 'A')
-    
-    if not all([user_id, company_id, username]):
-        flash('Campos obrigatórios não preenchidos', 'error')
-    else:
-        conn = get_db()
-        try:
-            # Verificar turma ativa da empresa
-            company = conn.execute('SELECT turma_ativa FROM companies WHERE id = ?', (company_id,)).fetchone()
-            user_active = 1 if company and company['turma_ativa'] == turma else 0
-            
-            if password:  # Se senha foi fornecida, atualizar com senha
-                conn.execute('''
-                    UPDATE hotspot_users 
-                    SET company_id = ?, profile_id = ?, username = ?, password = ?, 
-                        full_name = ?, email = ?, phone = ?, turma = ?, active = ?
-                    WHERE id = ?
-                ''', (company_id, profile_id, username, password, full_name, email, phone, turma, user_active, user_id))
-            else:  # Se senha não foi fornecida, manter a atual
-                conn.execute('''
-                    UPDATE hotspot_users 
-                    SET company_id = ?, profile_id = ?, username = ?, 
-                        full_name = ?, email = ?, phone = ?, turma = ?, active = ?
-                    WHERE id = ?
-                ''', (company_id, profile_id, username, full_name, email, phone, turma, user_active, user_id))
-            
-            conn.commit()
-            conn.close()
-            
-            # Sincronizar com MikroTik
-            sync_hotspot_users_to_mikrotik(company_id)
-            
-            flash('Usuário hotspot atualizado com sucesso!', 'success')
-        except sqlite3.IntegrityError:
-            flash('Username já existe', 'error')
-        finally:
-            conn.close()
-    
-    return redirect(url_for('hotspot_users'))
+    user = {'name': session.get('user_name', 'Usuário')}
+    return render_template('hotspot_users.html', user=user)
 
 @app.route('/credits')
-@require_auth
 def credits():
-    """Página de créditos"""
-    # Obter filtros da URL
-    company_filter = request.args.get('company', '')
-    month_filter = request.args.get('month', '')
-    
-    conn = get_db()
-    
-    # Construir query base
-    base_query = '''
-        SELECT hu.username, hu.full_name, c.name as company_name,
-               uc.total_mb, uc.used_mb, uc.remaining_mb, uc.last_reset, uc.updated_at,
-               c.id as company_id, strftime('%Y-%m', uc.created_at) as month_year
-        FROM user_credits uc
-        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
-        JOIN companies c ON hu.company_id = c.id
-        WHERE hu.active = 1
-    '''
-    
-    params = []
-    
-    # Aplicar filtro de empresa
-    if company_filter:
-        base_query += ' AND c.id = ?'
-        params.append(company_filter)
-    
-    # Aplicar filtro de mês
-    if month_filter:
-        base_query += ' AND strftime("%Y-%m", uc.created_at) = ?'
-        params.append(month_filter)
-    
-    base_query += ' ORDER BY uc.updated_at DESC'
-    
-    # Buscar créditos filtrados
-    credits_list = conn.execute(base_query, params).fetchall()
-    
-    # Calcular estatísticas baseadas nos filtros
-    stats_query = '''
-        SELECT 
-            SUM(uc.total_mb) as total_credits_mb,
-            SUM(uc.used_mb) as used_credits_mb,
-            SUM(uc.remaining_mb) as remaining_credits_mb,
-            COUNT(DISTINCT hu.id) as active_users
-        FROM user_credits uc
-        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
-        JOIN companies c ON hu.company_id = c.id
-        WHERE hu.active = 1
-    '''
-    
-    stats_params = []
-    if company_filter:
-        stats_query += ' AND c.id = ?'
-        stats_params.append(company_filter)
-    
-    if month_filter:
-        stats_query += ' AND strftime("%Y-%m", uc.created_at) = ?'
-        stats_params.append(month_filter)
-    
-    stats_result = conn.execute(stats_query, stats_params).fetchone()
-    
-    stats = {
-        'total_credits_mb': stats_result['total_credits_mb'] or 0,
-        'used_credits_mb': stats_result['used_credits_mb'] or 0,
-        'remaining_credits_mb': stats_result['remaining_credits_mb'] or 0,
-        'active_users': stats_result['active_users'] or 0
-    }
-    
-    # Buscar empresas para o filtro
-    companies_list = conn.execute('SELECT * FROM companies WHERE active = 1 ORDER BY name').fetchall()
-    
-    # Buscar meses disponíveis para o filtro
-    months_list = conn.execute('''
-        SELECT DISTINCT strftime('%Y-%m', uc.created_at) as month_year
-        FROM user_credits uc
-        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
-        WHERE hu.active = 1 AND uc.created_at IS NOT NULL
-        ORDER BY month_year DESC
-    ''').fetchall()
-    
-    conn.close()
-    
-    return render_template('credits.html', 
-                         user={'name': session.get('name')}, 
-                         stats=stats,
-                         credits_list=credits_list,
-                         companies_list=companies_list,
-                         months_list=months_list,
-                         selected_company=company_filter,
-                         selected_month=month_filter)
+    user = {'name': session.get('user_name', 'Usuário')}
+    return render_template('credits.html', user=user)
 
 @app.route('/reports')
-@require_auth
 def reports():
-    """Página de relatórios"""
-    # Obter filtros da URL
-    period = request.args.get('period', '7')
-    company_filter = request.args.get('company', '')
-    start_date = request.args.get('start_date', '')
-    end_date = request.args.get('end_date', '')
-    
-    conn = get_db()
-    
-    # Calcular período baseado na seleção
-    if period == 'custom' and start_date and end_date:
-        date_filter = f"DATE(uc.created_at) BETWEEN '{start_date}' AND '{end_date}'"
-    elif period == '7':
-        date_filter = "DATE(uc.created_at) >= DATE('now', '-7 days')"
-    elif period == '30':
-        date_filter = "DATE(uc.created_at) >= DATE('now', '-30 days')"
-    elif period == '90':
-        date_filter = "DATE(uc.created_at) >= DATE('now', '-90 days')"
-    else:
-        date_filter = "1=1"  # Sem filtro de data
-    
-    # Query base para estatísticas
-    stats_query = f'''
-        SELECT 
-            COUNT(DISTINCT hu.id) as total_users,
-            COUNT(DISTINCT CASE WHEN hu.active = 1 THEN hu.id END) as active_users,
-            COUNT(DISTINCT c.id) as total_companies,
-            SUM(uc.total_mb) as total_data_mb,
-            SUM(uc.used_mb) as used_data_mb,
-            SUM(uc.remaining_mb) as remaining_data_mb
-        FROM user_credits uc
-        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
-        JOIN companies c ON hu.company_id = c.id
-        WHERE {date_filter}
-    '''
-    
-    params = []
-    if company_filter:
-        stats_query += ' AND c.id = ?'
-        params.append(company_filter)
-    
-    stats_result = conn.execute(stats_query, params).fetchone()
-    
-    # Dados para gráfico de uso por empresa
-    usage_by_company_query = f'''
-        SELECT c.name as company_name, 
-               SUM(uc.used_mb) as used_mb,
-               COUNT(hu.id) as user_count
-        FROM user_credits uc
-        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
-        JOIN companies c ON hu.company_id = c.id
-        WHERE {date_filter}
-    '''
-    
-    usage_params = []
-    if company_filter:
-        usage_by_company_query += ' AND c.id = ?'
-        usage_params.append(company_filter)
-    
-    usage_by_company_query += ' GROUP BY c.id, c.name ORDER BY used_mb DESC'
-    usage_by_company = conn.execute(usage_by_company_query, usage_params).fetchall()
-    
-    # Dados para gráfico de usuários por turma
-    users_by_turma_query = f'''
-        SELECT hu.turma, 
-               COUNT(hu.id) as user_count,
-               COUNT(CASE WHEN hu.active = 1 THEN 1 END) as active_count
-        FROM hotspot_users hu
-        JOIN companies c ON hu.company_id = c.id
-        JOIN user_credits uc ON hu.id = uc.hotspot_user_id
-        WHERE {date_filter}
-    '''
-    
-    turma_params = []
-    if company_filter:
-        users_by_turma_query += ' AND c.id = ?'
-        turma_params.append(company_filter)
-    
-    users_by_turma_query += ' GROUP BY hu.turma ORDER BY hu.turma'
-    users_by_turma = conn.execute(users_by_turma_query, turma_params).fetchall()
-    
-    # Dados para gráfico de créditos ao longo do tempo
-    credits_timeline_query = f'''
-        SELECT DATE(uc.created_at) as date,
-               SUM(uc.total_mb) as total_mb,
-               SUM(uc.used_mb) as used_mb
-        FROM user_credits uc
-        JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
-        JOIN companies c ON hu.company_id = c.id
-        WHERE {date_filter}
-    '''
-    
-    timeline_params = []
-    if company_filter:
-        credits_timeline_query += ' AND c.id = ?'
-        timeline_params.append(company_filter)
-    
-    credits_timeline_query += ' GROUP BY DATE(uc.created_at) ORDER BY date DESC LIMIT 30'
-    credits_timeline = conn.execute(credits_timeline_query, timeline_params).fetchall()
-    
-    # Buscar empresas para o filtro
-    companies_list = conn.execute('SELECT * FROM companies WHERE active = 1 ORDER BY name').fetchall()
-    
-    conn.close()
-    
-    # Preparar dados para os gráficos
-    chart_data = {
-        'usage_by_company': {
-            'labels': [row['company_name'] for row in usage_by_company],
-            'data': [row['used_mb'] for row in usage_by_company]
-        },
-        'users_by_turma': {
-            'labels': [f"Turma {row['turma']}" for row in users_by_turma],
-            'data': [row['user_count'] for row in users_by_turma],
-            'active_data': [row['active_count'] for row in users_by_turma]
-        },
-        'credits_timeline': {
-            'labels': [row['date'] for row in reversed(credits_timeline)],
-            'total_data': [row['total_mb'] for row in reversed(credits_timeline)],
-            'used_data': [row['used_mb'] for row in reversed(credits_timeline)]
-        }
-    }
-    
-    return render_template('reports.html', 
-                         user={'name': session.get('name')},
-                         stats=stats_result,
-                         chart_data=chart_data,
-                         companies_list=companies_list,
-                         selected_period=period,
-                         selected_company=company_filter,
-                         selected_start_date=start_date,
-                         selected_end_date=end_date)
+    user = {'name': session.get('user_name', 'Usuário')}
+    return render_template('reports.html', user=user)
 
-@app.route('/settings', methods=['GET', 'POST'])
-@require_auth
+@app.route('/mikrotik-logs')
+def mikrotik_logs():
+    user = {'name': session.get('user_name', 'Usuário')}
+    return render_template('mikrotik_logs.html', user=user)
+
+@app.route('/settings')
 def settings():
-    """Página de configurações"""
-    if request.method == 'POST':
-        conn = get_db()
-        
-        # Verificar se é upload de logo
-        if 'logo' in request.files:
-            file = request.files['logo']
-            if file and file.filename and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                # Gerar nome único para o arquivo
-                unique_filename = f"logo_{uuid.uuid4().hex[:8]}.png"
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                
-                try:
-                    file.save(file_path)
-                    
-                    # Redimensionar imagem
-                    if resize_image(file_path):
-                        # Atualizar configuração do logo
-                        conn.execute('''
-                            UPDATE system_settings 
-                            SET value = ? 
-                            WHERE key = 'system_logo'
-                        ''', (unique_filename,))
-                        flash('Logo atualizado com sucesso!', 'success')
-                    else:
-                        os.remove(file_path)
-                        flash('Erro ao processar imagem', 'error')
-                except Exception as e:
-                    flash(f'Erro ao salvar logo: {str(e)}', 'error')
-        
-        # Atualizar outras configurações
-        settings_to_update = [
-            ('default_credit_mb', request.form.get('default_credit_mb')),
-            ('credit_reset_time', request.form.get('credit_reset_time')),
-            ('enable_cumulative', '1' if request.form.get('enable_cumulative') else '0'),
-            ('system_timezone', request.form.get('system_timezone')),
-            ('system_name', request.form.get('system_name')),
-            ('auto_collect_usage', '1' if request.form.get('auto_collect_usage') else '0')
-        ]
-        
-        for key, value in settings_to_update:
-            if value is not None:
-                conn.execute('''
-                    UPDATE system_settings 
-                    SET value = ? 
-                    WHERE key = ?
-                ''', (value, key))
-        
-        conn.commit()
-        conn.close()
-        flash('Configurações salvas com sucesso!', 'success')
-        return redirect(url_for('settings'))
-    
-    # Buscar configurações atuais
-    conn = get_db()
-    current_settings = {}
-    settings_rows = conn.execute('SELECT key, value FROM system_settings').fetchall()
-    for row in settings_rows:
-        current_settings[row['key']] = row['value']
-    conn.close()
-    
-    return render_template('settings.html', 
-                         user={'name': session.get('name')},
-                         settings=current_settings)
+    user = {'name': session.get('user_name', 'Usuário')}
+    return render_template('settings.html', user=user)
 
-@app.route('/uploads/<filename>')
-def uploaded_file(filename):
-    """Servir arquivos de upload"""
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
-# API Routes
-@app.route('/api/health')
-def api_health():
-    """Health check da API"""
-    return jsonify({
-        'status': 'ok',
-        'message': 'MikroTik Manager API funcionando',
-        'timestamp': datetime.now().isoformat()
-    })
-
-@app.route('/api/update-credits', methods=['POST'])
-@require_auth
-def api_update_credits():
-    """API para atualizar créditos cumulativos"""
-    try:
-        update_credits_cumulative()
-        return jsonify({'status': 'success', 'message': 'Créditos atualizados'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+@app.route('/users')
+def users():
+    user = {'name': session.get('user_name', 'Usuário')}
+    return render_template('users.html', user=user)
 
 if __name__ == '__main__':
     init_db()
-    
-    # Iniciar coleta automática se habilitada
-    auto_collect_enabled = get_setting('auto_collect_usage', '1') == '1'
-    if auto_collect_enabled:
-        start_auto_collect()
-    
-    print("🚀 Iniciando MikroTik Manager Flask...")
-    print("📧 Login: admin@demo.com")
-    print("🔑 Senha: admin123")
-    print("🌐 URL: http://localhost:5000")
-    print("💾 Banco: mikrotik_manager.db")
-    if auto_collect_enabled:
-        print("🔄 Coleta automática de uso: ATIVADA (a cada 1 minuto)")
-    else:
-        print("🔄 Coleta automática de uso: DESATIVADA")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    start_auto_collect()  # Iniciar coleta automática
+    app.run(debug=True, host='0.0.0.0', port=5000)
