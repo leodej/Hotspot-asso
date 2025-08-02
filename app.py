@@ -357,7 +357,7 @@ def collect_user_usage_from_mikrotik(company_id):
         )
         
         # Executar comando para listar usuários hotspot com detalhes
-        stdin, stdout, stderr = ssh.exec_command('/ip hotspot user print detail')
+        stdin, stdout, stderr = ssh.exec_command('/ip hotspot user print where comment~".*"')
         output = stdout.read().decode('utf-8')
         error = stderr.read().decode('utf-8')
         
@@ -634,7 +634,7 @@ def import_mikrotik_users(company_id):
         )
         
         # Executar comando para listar usuários hotspot
-        stdin, stdout, stderr = ssh.exec_command('/ip hotspot user print detail')
+        stdin, stdout, stderr = ssh.exec_command('/ip hotspot user print where comment~".*"')
         output = stdout.read().decode('utf-8')
         error = stderr.read().decode('utf-8')
         
