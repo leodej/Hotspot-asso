@@ -1494,8 +1494,6 @@ def settings():
                         os.remove(file_path)
                         flash('Erro ao processar imagem', 'error')
                 except Exception as e:
-                    flash(f'Erro ao salvar logo  'error')
-                except Exception as e:
                     flash(f'Erro ao salvar logo: {str(e)}', 'error')
         
         # Atualizar outras configurações
