@@ -89,7 +89,7 @@
               font-size: 0.875rem;
           }
 
-          .form-select {
+          .form-select, .form-input {
               width: 100%;
               padding: 0.5rem;
               border: 1px solid #d1d5db;
@@ -117,6 +117,18 @@
               cursor: pointer;
               text-decoration: none;
               display: inline-block;
+          }
+
+          .btn-success {
+              background: #10b981;
+              color: white;
+              padding: 0.5rem 1rem;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              text-decoration: none;
+              display: inline-block;
+              margin-left: 0.5rem;
           }
 
           .stats-grid {
@@ -184,6 +196,9 @@
           .table-header {
               padding: 1.5rem;
               border-bottom: 1px solid #e5e7eb;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
           }
 
           .table-title {
@@ -257,7 +272,66 @@
               background: #3b82f6;
               transition: width 0.3s ease;
           }
+
+          .modal {
+              display: none;
+              position: fixed;
+              z-index: 1000;
+              left: 0;
+              top: 0;
+              width: 100%;
+              height: 100%;
+              background-color: rgba(0,0,0,0.5);
+          }
+
+          .modal-content {
+              background-color: white;
+              margin: 15% auto;
+              padding: 2rem;
+              border-radius: 8px;
+              width: 90%;
+              max-width: 500px;
+          }
+
+          .modal-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 1.5rem;
+          }
+
+          .modal-title {
+              font-size: 1.25rem;
+              font-weight: 600;
+              color: #1f2937;
+          }
+
+          .close-btn {
+              background: none;
+              border: none;
+              font-size: 1.5rem;
+              cursor: pointer;
+              color: #6b7280;
+          }
+
+          .form-actions {
+              display: flex;
+              gap: 1rem;
+              justify-content: flex-end;
+              margin-top: 1.5rem;
+          }
       </style>
+
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+              {% for category, message in messages %}
+                  <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'warning' if category == 'warning' else 'info' }}" style="background: {{ '#fee2e2' if category == 'error' else '#d1fae5' if category == 'success' else '#fef3c7' if category == 'warning' else '#dbeafe' }}; color: {{ '#991b1b' if category == 'error' else '#065f46' if category == 'success' else '#92400e' if category == 'warning' else '#1e40af' }}; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                      {{ message }}
+                  </div>
+              {% endfor %}
+          {% endif %}
+      {% endwith %}
 
       <!-- Filtros -->
       <form method="GET" class="filters-section">
@@ -290,6 +364,7 @@
           </div>
           <button type="submit" class="btn-primary">Aplicar Filtros</button>
           <a href="{{ url_for('credits') }}" class="btn-secondary" style="margin-left: 0.5rem;">Limpar Filtros</a>
+          <button type="button" class="btn-success" onclick="openAddCreditModal()">+ Adicionar Crédito</button>
       </form>
 
       <!-- Estatísticas -->
@@ -334,13 +409,15 @@
       <!-- Tabela de Créditos -->
       <div class="credits-table">
           <div class="table-header">
-              <div class="table-title">
-                  Créditos por Usuário
-                  {% if selected_company or selected_month %}
-                      ({{ credits_list|length }} resultados encontrados)
-                  {% endif %}
+              <div>
+                  <div class="table-title">
+                      Créditos por Usuário
+                      {% if selected_company or selected_month %}
+                          ({{ credits_list|length }} resultados encontrados)
+                      {% endif %}
+                  </div>
+                  <div class="table-description">Lista detalhada dos créditos de cada usuário</div>
               </div>
-              <div class="table-description">Lista detalhada dos créditos de cada usuário</div>
           </div>
 
           <table class="table">
@@ -415,6 +492,53 @@
               </tbody>
           </table>
       </div>
+
+      <!-- Modal para Adicionar Crédito -->
+      <div id="addCreditModal" class="modal">
+          <div class="modal-content">
+              <div class="modal-header">
+                  <h3 class="modal-title">Adicionar Crédito Manual</h3>
+                  <button type="button" class="close-btn" onclick="closeAddCreditModal()">&times;</button>
+              </div>
+              <form method="POST">
+                  <div class="form-group">
+                      <label class="form-label">Usuário</label>
+                      <select name="user_id" class="form-select" required>
+                          <option value="">Selecione um usuário</option>
+                          {% for user in users_list %}
+                          <option value="{{ user.id }}">{{ user.username }} - {{ user.full_name or user.company_name }}</option>
+                          {% endfor %}
+                      </select>
+                  </div>
+                  <div class="form-group">
+                      <label class="form-label">Quantidade de Crédito (MB)</label>
+                      <input type="number" name="credit_amount" class="form-input" min="1" placeholder="1024" required>
+                      <small style="color: #6b7280; font-size: 0.75rem;">Digite a quantidade em MB (ex: 1024 = 1GB)</small>
+                  </div>
+                  <div class="form-actions">
+                      <button type="button" class="btn-secondary" onclick="closeAddCreditModal()">Cancelar</button>
+                      <button type="submit" class="btn-primary">Adicionar Crédito</button>
+                  </div>
+              </form>
+          </div>
+      </div>
+
+      <script>
+          function openAddCreditModal() {
+              document.getElementById('addCreditModal').style.display = 'block';
+          }
+
+          function closeAddCreditModal() {
+              document.getElementById('addCreditModal').style.display = 'none';
+          }
+
+          window.onclick = function(event) {
+              const modal = document.getElementById('addCreditModal');
+              if (event.target == modal) {
+                  modal.style.display = 'none';
+              }
+          }
+      </script>
   </main>
 </div>
 {% endblock %}

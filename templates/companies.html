@@ -146,6 +146,10 @@
               background: #8b5cf6;
               color: white;
           }
+          .btn-bytes {
+              background: #ef4444;
+              color: white;
+          }
           .btn-action:hover {
               opacity: 0.8;
           }
@@ -370,6 +374,12 @@
                   <form method="post" action="/companies/{{ company.id }}/collect-usage" style="display: inline; flex: 1;">
                       <button type="submit" class="btn-action btn-usage" title="Coletar Uso">
                           📊 Coletar Uso
+                      </button>
+                  </form>
+                  
+                  <form method="post" action="/companies/{{ company.id }}/sync-bytes-limit" style="display: inline; flex: 1;">
+                      <button type="submit" class="btn-action btn-bytes" title="Sincronizar Limite-Bytes">
+                          💾 Limite-Bytes
                       </button>
                   </form>
                   

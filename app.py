@@ -887,6 +887,82 @@ def sync_credits_to_mikrotik_total_bytes():
     print(f"🎯 Sincronização concluída: {total_synced} sucessos, {total_errors} erros")
     return total_synced, total_errors
 
+def sync_company_bytes_limit(company_id):
+    """Sincroniza limite de bytes para usuários de uma empresa específica"""
+    conn = get_db()
+    company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
+    
+    if not company:
+        return False, 'Empresa não encontrada'
+    
+    start_time = time.time()
+    
+    try:
+        # Buscar usuários ativos da turma ativa com seus créditos
+        users_with_credits = conn.execute('''
+            SELECT hu.username, uc.remaining_mb
+            FROM hotspot_users hu
+            JOIN user_credits uc ON hu.id = uc.hotspot_user_id
+            WHERE hu.company_id = ? AND hu.active = 1 AND hu.turma = ?
+        ''', (company_id, company['turma_ativa'])).fetchall()
+        
+        if not users_with_credits:
+            return False, 'Nenhum usuário ativo encontrado'
+        
+        # Conectar no MikroTik
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        ssh.connect(
+            hostname=company['mikrotik_ip'],
+            port=int(company['mikrotik_port']),
+            username=company['mikrotik_user'],
+            password=company['mikrotik_password'],
+            timeout=15
+        )
+        
+        synced_count = 0
+        
+        for user in users_with_credits:
+            try:
+                # Converter MB para bytes (MikroTik usa bytes)
+                total_bytes = int(user['remaining_mb'] * 1024 * 1024)
+                
+                # Comando para definir limite-bytes do usuário
+                command = f'/ip hotspot user set [find name="{user["username"]}"] limit-bytes-total={total_bytes}'
+                
+                stdin, stdout, stderr = ssh.exec_command(command)
+                error = stderr.read().decode('utf-8')
+                
+                if not error:
+                    synced_count += 1
+                    
+            except Exception as e:
+                print(f"Erro ao processar usuário {user['username']}: {e}")
+        
+        ssh.close()
+        
+        response_time = time.time() - start_time
+        message = f'Sincronizados {synced_count} usuários com limite-bytes'
+        
+        log_mikrotik_connection(
+            company_id, 'sync_bytes_limit', 'success', 
+            message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        return True, message
+        
+    except Exception as e:
+        response_time = time.time() - start_time
+        error_message = f'Erro na sincronização de limite-bytes: {str(e)}'
+        
+        log_mikrotik_connection(
+            company_id, 'sync_bytes_limit', 'failed', 
+            error_message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        return False, error_message
+
 def schedule_daily_credit_sync():
     """Agenda a sincronização diária de créditos às 00:00 (horário do Brasil)"""
     
@@ -1317,6 +1393,27 @@ def collect_company_usage(company_id):
     
     return redirect(url_for('companies'))
 
+@app.route('/companies/<company_id>/sync-bytes-limit', methods=['POST'])
+@require_auth
+def sync_company_bytes_limit_route(company_id):
+    """Sincronizar limite de bytes com MikroTik"""
+    conn = get_db()
+    company = conn.execute('SELECT name FROM companies WHERE id = ?', (company_id,)).fetchone()
+    conn.close()
+    
+    if not company:
+        flash('Empresa não encontrada', 'error')
+        return redirect(url_for('companies'))
+    
+    success, message = sync_company_bytes_limit(company_id)
+    
+    if success:
+        flash(f'Sincronização de limite-bytes de {company["name"]}: {message}', 'success')
+    else:
+        flash(f'Falha na sincronização de limite-bytes de {company["name"]}: {message}', 'error')
+    
+    return redirect(url_for('companies'))
+
 @app.route('/collect-all-usage', methods=['POST'])
 @require_auth
 def collect_all_usage():
@@ -1600,10 +1697,56 @@ def edit_hotspot_user():
     
     return redirect(url_for('hotspot_users'))
 
-@app.route('/credits')
+@app.route('/credits', methods=['GET', 'POST'])
 @require_auth
 def credits():
     """Página de créditos"""
+    if request.method == 'POST':
+        # Adicionar crédito manualmente
+        user_id = request.form.get('user_id')
+        credit_amount = request.form.get('credit_amount')
+        
+        if not all([user_id, credit_amount]):
+            flash('Todos os campos são obrigatórios', 'error')
+        else:
+            try:
+                credit_mb = int(credit_amount)
+                if credit_mb <= 0:
+                    flash('Valor do crédito deve ser maior que zero', 'error')
+                else:
+                    conn = get_db()
+                    
+                    # Verificar se usuário existe
+                    user = conn.execute('SELECT username FROM hotspot_users WHERE id = ?', (user_id,)).fetchone()
+                    if not user:
+                        flash('Usuário não encontrado', 'error')
+                    else:
+                        # Atualizar créditos
+                        conn.execute('''
+                            UPDATE user_credits 
+                            SET total_mb = total_mb + ?, 
+                                remaining_mb = remaining_mb + ?,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE hotspot_user_id = ?
+                        ''', (credit_mb, credit_mb, user_id))
+                        
+                        if conn.total_changes == 0:
+                            # Criar registro de crédito se não existir
+                            conn.execute('''
+                                INSERT INTO user_credits (id, hotspot_user_id, total_mb, remaining_mb, last_reset)
+                                VALUES (?, ?, ?, ?, DATE('now'))
+                            ''', (str(uuid.uuid4()), user_id, credit_mb, credit_mb))
+                        
+                        conn.commit()
+                        conn.close()
+                        
+                        flash(f'Crédito de {credit_mb} MB adicionado para {user["username"]}!', 'success')
+                        
+            except ValueError:
+                flash('Valor do crédito deve ser um número válido', 'error')
+        
+        return redirect(url_for('credits'))
+    
     # Obter filtros da URL
     company_filter = request.args.get('company', '')
     month_filter = request.args.get('month', '')
@@ -1614,7 +1757,8 @@ def credits():
     base_query = '''
         SELECT hu.username, hu.full_name, c.name as company_name,
                uc.total_mb, uc.used_mb, uc.remaining_mb, uc.last_reset, uc.updated_at,
-               c.id as company_id, strftime('%Y-%m', uc.created_at) as month_year
+               c.id as company_id, strftime('%Y-%m', uc.created_at) as month_year,
+               hu.id as user_id
         FROM user_credits uc
         JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
         JOIN companies c ON hu.company_id = c.id
@@ -1681,6 +1825,15 @@ def credits():
         ORDER BY month_year DESC
     ''').fetchall()
     
+    # Buscar usuários para adicionar crédito
+    users_list = conn.execute('''
+        SELECT hu.id, hu.username, hu.full_name, c.name as company_name
+        FROM hotspot_users hu
+        JOIN companies c ON hu.company_id = c.id
+        WHERE hu.active = 1
+        ORDER BY hu.username
+    ''').fetchall()
+    
     conn.close()
     
     return render_template('credits.html', 
@@ -1689,6 +1842,7 @@ def credits():
                          credits_list=credits_list,
                          companies_list=companies_list,
                          months_list=months_list,
+                         users_list=users_list,
                          selected_company=company_filter,
                          selected_month=month_filter)
 
