@@ -963,6 +963,88 @@ def sync_company_bytes_limit(company_id):
         
         return False, error_message
 
+def sync_hotspot_users_to_mikrotik(company_id):
+    """Sincroniza usuários hotspot com MikroTik baseado na turma ativa"""
+    conn = get_db()
+    company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
+    
+    if not company:
+        return False, 'Empresa não encontrada'
+    
+    start_time = time.time()
+    
+    try:
+        # Buscar usuários da empresa
+        users = conn.execute('''
+            SELECT username, active, turma
+            FROM hotspot_users 
+            WHERE company_id = ?
+        ''', (company_id,)).fetchall()
+        
+        if not users:
+            return False, 'Nenhum usuário encontrado'
+        
+        # Conectar no MikroTik
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        ssh.connect(
+            hostname=company['mikrotik_ip'],
+            port=int(company['mikrotik_port']),
+            username=company['mikrotik_user'],
+            password=company['mikrotik_password'],
+            timeout=15
+        )
+        
+        synced_count = 0
+        
+        for user in users:
+            try:
+                # Determinar se usuário deve estar ativo (turma ativa da empresa)
+                should_be_active = (user['turma'] == company['turma_ativa'])
+                
+                if should_be_active and user['active'] == 1:
+                    # Habilitar usuário no MikroTik
+                    command = f'/ip hotspot user set [find name="{user["username"]}"] disabled=no'
+                elif not should_be_active or user['active'] == 0:
+                    # Desabilitar usuário no MikroTik
+                    command = f'/ip hotspot user set [find name="{user["username"]}"] disabled=yes'
+                else:
+                    continue
+                
+                stdin, stdout, stderr = ssh.exec_command(command)
+                error = stderr.read().decode('utf-8')
+                
+                if not error:
+                    synced_count += 1
+                    
+            except Exception as e:
+                print(f"Erro ao processar usuário {user['username']}: {e}")
+        
+        ssh.close()
+        conn.close()
+        
+        response_time = time.time() - start_time
+        message = f'Sincronizados {synced_count} usuários com MikroTik'
+        
+        log_mikrotik_connection(
+            company_id, 'sync_users', 'success', 
+            message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        return True, message
+        
+    except Exception as e:
+        response_time = time.time() - start_time
+        error_message = f'Erro na sincronização de usuários: {str(e)}'
+        
+        log_mikrotik_connection(
+            company_id, 'sync_users', 'failed', 
+            error_message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+        )
+        
+        return False, error_message
+
 def schedule_daily_credit_sync():
     """Agenda a sincronização diária de créditos às 00:00 (horário do Brasil)"""
     
