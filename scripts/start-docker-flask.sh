@@ -41,7 +41,7 @@ docker-compose up -d --build
 
 # Aguardar inicialização
 echo "⏳ Aguardando inicialização..."
-sleep 10
+sleep 5
 
 # Verificar status
 echo "📊 Status dos containers:"
@@ -49,19 +49,11 @@ docker-compose ps
 
 echo ""
 echo "✅ Sistema Flask iniciado!"
-
-if [ "$HTTPS_MODE" = true ]; then
-    echo "🔒 URL HTTPS: https://hotspot.flcomm.com.br"
-    echo "🌐 URL HTTP: http://hotspot.flcomm.com.br (redireciona para HTTPS)"
-else
-    echo "🌐 URL HTTP: http://localhost:5000"
-fi
-
+echo "🌐 URL: https://hotspot.flcomm.com.br"
 echo "📧 Login: admin@demo.com"
 echo "🔑 Senha: admin123"
 echo ""
 echo "🔍 Para ver logs: docker-compose logs -f app"
-echo "🔄 Para renovar SSL: ./scripts/renew-ssl.sh"
 
 # Mostrar informações adicionais se HTTPS
 if [ "$HTTPS_MODE" = true ]; then
