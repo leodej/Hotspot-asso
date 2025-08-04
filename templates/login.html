@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Login - MikroTik Manager{% endblock %}
+{% block title %}Login - Hotspot Manager{% endblock %}
 
 {% block body %}
 <style>
@@ -93,23 +93,13 @@
   .btn:hover {
       background: #2563eb;
   }
-
-  .demo-info {
-      margin-top: 1.5rem;
-      padding: 1rem;
-      background: #f9fafb;
-      border-radius: 6px;
-      text-align: center;
-      font-size: 0.85rem;
-      color: #6b7280;
-  }
 </style>
 
 <div class="login-container">
   <div class="logo">
       <div class="logo-icon">MT</div>
-      <h1>MIKROTIK MANAGER</h1>
-      <p class="subtitle">Sistema de gerenciamento de roteadores MikroTik</p>
+      <h1>HOTSPOT MANAGER</h1>
+      <p class="subtitle">Sistema de gerenciamento de hotspot</p>
   </div>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -125,22 +115,17 @@
   <form method="POST" action="{{ url_for('login') }}">
       <div class="form-group">
           <label for="email">Email</label>
-          <input type="email" id="email" name="email" required value="admin@demo.com">
+          <input type="email" id="email" name="email" required>
       </div>
 
       <div class="form-group">
           <label for="password">Senha</label>
-          <input type="password" id="password" name="password" required value="admin123">
+          <input type="password" id="password" name="password" required>
       </div>
 
       <button type="submit" class="btn">Entrar</button>
   </form>
 
-  <div class="demo-info">
-      <strong>Credenciais de teste:</strong><br>
-      Email: admin@demo.com<br>
-      Senha: admin123
-  </div>
   <div class="text-center mt-3">
       <a href="{{ url_for('consulta_publica') }}" class="btn" style="background: #10b981; margin-top: 1rem;">
           Consulta de Consumo
