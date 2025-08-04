@@ -1,475 +1,73 @@
-{% extends "base.html" %}
-
-{% block title %}Configurações - MikroTik Manager{% endblock %}
-
-{% block body %}
-<div class="container">
-    <aside class="sidebar">
-        <div class="logo">
-            <div class="logo-icon">MT</div>
-            <div class="logo-text">
-                <h2>MikroTik Manager</h2>
-                <p>Sistema de Gestão</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="mt-4">Configurações</h1>
+        <!-- Seção de Configurações Gerais -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cogs me-2"></i>
+                    Configurações Gerais
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Configurações específicas aqui -->
             </div>
         </div>
 
-        <nav>
-            <ul class="nav-menu">
-                <li class="nav-item">
-                    <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ url_for('users') }}" class="nav-link">Usuários</a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ url_for('companies') }}" class="nav-link">Empresas</a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ url_for('profiles') }}" class="nav-link">Perfis Hotspot</a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ url_for('hotspot_users') }}" class="nav-link">Usuários Hotspot</a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ url_for('credits') }}" class="nav-link">Créditos</a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ url_for('reports') }}" class="nav-link">Relatórios</a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ url_for('settings') }}" class="nav-link active">Configurações</a>
-                </li>
-            </ul>
-        </nav>
-    </aside>
-
-    <main class="main-content">
-        <div class="header">
-            <div>
-                <h1>Configurações do Sistema</h1>
-                <p>Configure parâmetros e preferências do sistema</p>
+        <!-- Seção de Backup e Restauração -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-database me-2"></i>
+                    Backup e Restauração de Dados
+                </h5>
             </div>
-            <div class="user-info">
-                <span class="user-name">{{ user.name }}</span>
-                <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
-            </div>
-        </div>
-
-        <style>
-            .settings-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-                gap: 1.5rem;
-            }
-
-            .settings-card {
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                overflow: hidden;
-            }
-
-            .card-header {
-                padding: 1.5rem;
-                border-bottom: 1px solid #f3f4f6;
-                background: #f9fafb;
-            }
-
-            .card-title {
-                font-size: 1.125rem;
-                font-weight: 600;
-                color: #1f2937;
-                margin-bottom: 0.25rem;
-            }
-
-            .card-description {
-                font-size: 0.875rem;
-                color: #6b7280;
-            }
-
-            .card-content {
-                padding: 1.5rem;
-            }
-
-            .form-group {
-                margin-bottom: 1rem;
-            }
-
-            .form-group:last-child {
-                margin-bottom: 0;
-            }
-
-            .form-label {
-                display: block;
-                font-size: 0.875rem;
-                font-weight: 500;
-                color: #374151;
-                margin-bottom: 0.5rem;
-            }
-
-            .form-input, .form-select {
-                width: 100%;
-                padding: 0.75rem;
-                border: 1px solid #d1d5db;
-                border-radius: 6px;
-                font-size: 0.875rem;
-                transition: border-color 0.2s;
-            }
-
-            .form-input:focus, .form-select:focus {
-                outline: none;
-                border-color: #3b82f6;
-                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-            }
-
-            .form-checkbox {
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-            }
-
-            .form-checkbox input {
-                width: auto;
-            }
-
-            .btn-save {
-                background: #10b981;
-                color: white;
-                border: none;
-                padding: 0.75rem 1.5rem;
-                border-radius: 6px;
-                font-size: 0.875rem;
-                font-weight: 500;
-                cursor: pointer;
-                transition: background-color 0.2s;
-            }
-
-            .btn-save:hover {
-                background: #059669;
-            }
-
-            .credit-highlight {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border: none;
-            }
-
-            .credit-highlight .card-header {
-                background: rgba(255, 255, 255, 0.1);
-                border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            }
-
-            .credit-highlight .card-title,
-            .credit-highlight .card-description {
-                color: white;
-            }
-
-            .credit-highlight .form-label {
-                color: rgba(255, 255, 255, 0.9);
-            }
-
-            .credit-highlight .form-input,
-            .credit-highlight .form-select {
-                background: rgba(255, 255, 255, 0.1);
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                color: white;
-            }
-
-            .credit-highlight .form-input::placeholder {
-                color: rgba(255, 255, 255, 0.7);
-            }
-
-            .help-text {
-                font-size: 0.75rem;
-                color: #6b7280;
-                margin-top: 0.25rem;
-            }
-
-            .credit-highlight .help-text {
-                color: rgba(255, 255, 255, 0.8);
-            }
-
-            .branding-highlight {
-                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-                color: white;
-                border: none;
-            }
-
-            .branding-highlight .card-header {
-                background: rgba(255, 255, 255, 0.1);
-                border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            }
-
-            .branding-highlight .card-title,
-            .branding-highlight .card-description {
-                color: white;
-            }
-
-            .branding-highlight .form-label {
-                color: rgba(255, 255, 255, 0.9);
-            }
-
-            .branding-highlight .form-input,
-            .branding-highlight .form-select {
-                background: rgba(255, 255, 255, 0.1);
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                color: white;
-            }
-
-            .branding-highlight .form-input::placeholder {
-                color: rgba(255, 255, 255, 0.7);
-            }
-
-            .branding-highlight .help-text {
-                color: rgba(255, 255, 255, 0.8);
-            }
-
-            .logo-preview {
-                width: 64px;
-                height: 64px;
-                border: 2px solid rgba(255, 255, 255, 0.3);
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: rgba(255, 255, 255, 0.1);
-                margin-top: 0.5rem;
-            }
-
-            .logo-preview img {
-                max-width: 60px;
-                max-height: 60px;
-                border-radius: 4px;
-            }
-
-            .logo-preview-text {
-                color: rgba(255, 255, 255, 0.7);
-                font-size: 0.75rem;
-                text-align: center;
-            }
-
-            .file-input-wrapper {
-                position: relative;
-                display: inline-block;
-                width: 100%;
-            }
-
-            .file-input {
-                position: absolute;
-                opacity: 0;
-                width: 100%;
-                height: 100%;
-                cursor: pointer;
-            }
-
-            .file-input-label {
-                display: block;
-                padding: 0.75rem;
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                border-radius: 6px;
-                background: rgba(255, 255, 255, 0.1);
-                color: rgba(255, 255, 255, 0.9);
-                cursor: pointer;
-                text-align: center;
-                transition: all 0.2s;
-            }
-
-            .file-input-label:hover {
-                background: rgba(255, 255, 255, 0.2);
-            }
-        </style>
-
-        <div class="settings-grid">
-            <div class="settings-card branding-highlight">
-                <div class="card-header">
-                    <h3 class="card-title">🎨 Identidade Visual</h3>
-                    <p class="card-description">Configure o logo e nome do sistema</p>
-                </div>
-                <div class="card-content">
-                    <form method="POST" enctype="multipart/form-data">
-                        <div class="form-group">
-                            <label class="form-label">Nome do Sistema</label>
-                            <input type="text" name="system_name" class="form-input" 
-                                   value="{{ settings.get('system_name', 'MikroTik Manager') }}" 
-                                   placeholder="MikroTik Manager">
-                            <div class="help-text">Nome exibido no sistema e nos relatórios</div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Logo do Sistema</label>
-                            <div class="file-input-wrapper">
-                                <input type="file" name="logo" class="file-input" accept=".png,.jpg,.jpeg,.svg" id="logoInput">
-                                <label for="logoInput" class="file-input-label">
-                                    📁 Escolher arquivo de logo
-                                </label>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Fazer Backup</h6>
+                        <p class="text-muted small">Baixe uma cópia completa do banco de dados</p>
+                        <a href="{{ url_for('download_backup') }}" class="btn btn-primary">
+                            <i class="fas fa-download me-2"></i>
+                            Baixar Backup
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Restaurar Backup</h6>
+                        <p class="text-muted small">Restaure dados de um arquivo de backup (.db)</p>
+                        <form method="POST" action="{{ url_for('restore_backup') }}" enctype="multipart/form-data" 
+                              onsubmit="return confirm('ATENÇÃO: Esta operação irá substituir todos os dados atuais. Um backup será criado automaticamente antes da restauração. Deseja continuar?')">
+                            <div class="input-group">
+                                <input type="file" class="form-control" name="backup_file" accept=".db" required>
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="fas fa-upload me-2"></i>
+                                    Restaurar
+                                </button>
                             </div>
-                            <div class="help-text">Formatos aceitos: PNG, JPG, SVG (será redimensionado para 64x64px)</div>
-                            
-                            <div class="logo-preview" id="logoPreview">
-                                {% if settings.get('system_logo') %}
-                                    <img src="{{ url_for('uploaded_file', filename=settings.get('system_logo')) }}" alt="Logo atual">
-                                {% else %}
-                                    <div class="logo-preview-text">Nenhum logo<br>carregado</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <button type="submit" class="btn-save">💾 Salvar Identidade Visual</button>
-                    </form>
-                </div>
-            </div>
-
-            <div class="settings-card credit-highlight">
-                <div class="card-header">
-                    <h3 class="card-title">⚡ Configurações de Créditos</h3>
-                    <p class="card-description">Configure o sistema de créditos em MB/GB</p>
-                </div>
-                <div class="card-content">
-                    <form method="POST">
-                        <div class="form-group">
-                            <label class="form-label">Crédito Padrão (MB)</label>
-                            <input type="number" name="default_credit_mb" class="form-input" 
-                                   value="{{ settings.get('default_credit_mb', 1024) }}" 
-                                   placeholder="1024">
-                            <div class="help-text">Crédito inicial para novos usuários hotspot</div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Horário de Reset</label>
-                            <input type="time" name="credit_reset_time" class="form-input" 
-                                   value="{{ settings.get('credit_reset_time', '00:00') }}">
-                            <div class="help-text">Horário diário para reset/acúmulo de créditos</div>
-                        </div>
-                        <div class="form-group">
-                            <div class="form-checkbox">
-                                <input type="checkbox" name="enable_cumulative" 
-                                       {% if settings.get('enable_cumulative', '1') == '1' %}checked{% endif %}>
-                                <label>Habilitar Créditos Cumulativos</label>
-                            </div>
-                            <div class="help-text">Se ativado, créditos não utilizados são acumulados no dia seguinte</div>
-                        </div>
-                        <button type="submit" class="btn-save">💾 Salvar Configurações</button>
-                    </form>
-                </div>
-            </div>
-
-            <div class="settings-card">
-                <div class="card-header">
-                    <h3 class="card-title">Configurações Gerais</h3>
-                    <p class="card-description">Configurações básicas do sistema</p>
-                </div>
-                <div class="card-content">
-                    <form method="POST">
-                        <div class="form-group">
-                            <label class="form-label">Timezone</label>
-                            <select name="system_timezone" class="form-select">
-                                <option value="America/Sao_Paulo" 
-                                        {% if settings.get('system_timezone') == 'America/Sao_Paulo' %}selected{% endif %}>
-                                    America/Sao_Paulo
-                                </option>
-                                <option value="America/New_York"
-                                        {% if settings.get('system_timezone') == 'America/New_York' %}selected{% endif %}>
-                                    America/New_York
-                                </option>
-                                <option value="Europe/London"
-                                        {% if settings.get('system_timezone') == 'Europe/London' %}selected{% endif %}>
-                                    Europe/London
-                                </option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Versão</label>
-                            <input type="text" class="form-input" value="1.0.0" readonly>
-                        </div>
-                        <button type="submit" class="btn-save">Salvar Configurações</button>
-                    </form>
-                </div>
-            </div>
-
-            <div class="settings-card">
-                <div class="card-header">
-                    <h3 class="card-title">Configurações de Segurança</h3>
-                    <p class="card-description">Configure políticas de segurança</p>
-                </div>
-                <div class="card-content">
-                    <div class="form-group">
-                        <label class="form-label">Tempo de Sessão (minutos)</label>
-                        <input type="number" class="form-input" value="60">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Tentativas de Login</label>
-                        <input type="number" class="form-input" value="5">
-                    </div>
-                    <div class="form-group">
-                        <div class="form-checkbox">
-                            <input type="checkbox" checked>
-                            <label>Log de auditoria</label>
-                        </div>
-                    </div>
-                    <button class="btn-save">Salvar Configurações</button>
-                </div>
-            </div>
-
-            <div class="settings-card">
-                <div class="card-header">
-                    <h3 class="card-title">Backup e Manutenção</h3>
-                    <p class="card-description">Configure backups e manutenção</p>
-                </div>
-                <div class="card-content">
-                    <div class="form-group">
-                        <label class="form-label">Backup Completo do Sistema</label>
-                        <a href="{{ url_for('download_backup') }}" class="btn-save" style="display: inline-block; text-decoration: none; text-align: center; margin-bottom: 1rem;">
-            💾 Baixar Backup Completo
-        </a>
-                        <div class="help-text">Baixa uma cópia completa do banco de dados do sistema</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Restaurar Backup</label>
-                        <form method="POST" action="{{ url_for('restore_backup') }}" enctype="multipart/form-data" style="margin-bottom: 1rem;">
-                            <input type="file" name="backup_file" accept=".db" class="form-input" style="margin-bottom: 0.5rem;" required>
-                            <button type="submit" class="btn-save" onclick="return confirm('⚠️ ATENÇÃO: Esta operação irá substituir todos os dados atuais do sistema. Um backup automático será criado antes da restauração. Deseja continuar?')">
-                🔄 Restaurar Backup
-            </button>
                         </form>
-                        <div class="help-text">⚠️ CUIDADO: Restaurar um backup substitui todos os dados atuais. Um backup automático será criado antes da operação.</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Backup Automático</label>
-                        <select class="form-select">
-                            <option>Diário</option>
-                            <option>Semanal</option>
-                            <option>Mensal</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Retenção (dias)</label>
-                        <input type="number" class="form-input" value="30">
-                    </div>
-                    <div class="form-group">
-                        <div class="form-checkbox">
-                            <input type="checkbox" checked>
-                            <label>Backup automático ativado</label>
-                        </div>
+                        <small class="text-warning">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            Operação irreversível - faça backup antes de restaurar
+                        </small>
                     </div>
                 </div>
             </div>
         </div>
-    </main>
-</div>
 
-<script>
-document.getElementById('logoInput').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    const preview = document.getElementById('logoPreview');
-    
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            preview.innerHTML = '<img src="' + e.target.result + '" alt="Preview do logo">';
-        };
-        reader.readAsDataURL(file);
-    }
-});
-</script>
-{% endblock %}
+        <!-- ** rest of code here ** -->
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

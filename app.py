@@ -1957,6 +1957,56 @@ def restore_backup():
     
     return redirect(url_for('settings'))
 
+@app.route('/consulta')
+def consulta_publica():
+    """Página pública para consulta de consumo"""
+    return render_template('consulta_publica.html')
+
+@app.route('/consulta/usuario', methods=['POST'])
+def consulta_usuario():
+    """Consulta dados de consumo de um usuário específico"""
+    username = request.form.get('username', '').strip()
+    
+    if not username:
+        flash('Digite um nome de usuário', 'error')
+        return redirect(url_for('consulta_publica'))
+    
+    conn = get_db()
+    
+    # Buscar usuário e seus dados de crédito
+    user_data = conn.execute('''
+        SELECT hu.username, hu.full_name, c.name as company_name,
+               uc.total_mb, uc.used_mb, uc.remaining_mb, uc.last_reset, uc.updated_at
+        FROM hotspot_users hu
+        JOIN companies c ON hu.company_id = c.id
+        LEFT JOIN user_credits uc ON hu.id = uc.hotspot_user_id
+        WHERE hu.username = ? AND hu.active = 1
+        LIMIT 1
+    ''', (username,)).fetchone()
+    
+    if not user_data:
+        flash('Usuário não encontrado ou inativo', 'error')
+        return redirect(url_for('consulta_publica'))
+    
+    # Buscar histórico dos últimos 30 dias (simulado baseado na última atualização)
+    historico = conn.execute('''
+        SELECT DATE(ml.created_at) as data, 
+               'Coleta de dados' as acao,
+               ml.created_at
+        FROM mikrotik_connection_logs ml
+        JOIN companies c ON ml.company_id = c.id
+        JOIN hotspot_users hu ON hu.company_id = c.id
+        WHERE hu.username = ? AND ml.action = 'collect_usage' AND ml.status = 'success'
+        AND DATE(ml.created_at) >= DATE('now', '-30 days')
+        GROUP BY DATE(ml.created_at)
+        ORDER BY ml.created_at DESC
+        LIMIT 30
+    ''', (username,)).fetchall()
+    
+    conn.close()
+    
+    return render_template('consulta_resultado.html', user_data=user_data, historico=historico)
+
 # API Routes
 @app.route('/api/health')
 def api_health():
