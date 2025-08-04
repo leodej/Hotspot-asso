@@ -620,6 +620,49 @@ export default function SettingsPage() {
                     {testingBackup ? "Criando..." : "Criar Backup Agora"}
                   </Button>
                 </div>
+
+                <div className="border-t pt-6 space-y-4">
+                  <h3 className="text-lg font-medium">Backup e Restauração de Dados</h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Download Backup</CardTitle>
+                        <CardDescription>Baixar backup completo do banco de dados</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <a
+                          href="/backup/download"
+                          className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 w-full"
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Baixar Backup
+                        </a>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Restaurar Backup</CardTitle>
+                        <CardDescription>Restaurar dados de um arquivo de backup</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <form action="/backup/restore" method="post" encType="multipart/form-data">
+                          <div className="space-y-3">
+                            <Input type="file" name="backup_file" accept=".db" required className="cursor-pointer" />
+                            <Button type="submit" variant="destructive" className="w-full">
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              Restaurar Backup
+                            </Button>
+                          </div>
+                        </form>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          ⚠️ Esta ação substituirá todos os dados atuais
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

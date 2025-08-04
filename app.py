@@ -979,6 +979,43 @@ def update_users_by_turma(company_id, turma_ativa):
     conn.commit()
     conn.close()
 
+def create_database_backup():
+    """Cria backup completo do banco de dados"""
+    try:
+        import tempfile
+        import shutil
+        from datetime import datetime
+        
+        # Criar arquivo temporário para o backup
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_filename = f"mikrotik_manager_backup_{timestamp}.db"
+        
+        # Copiar banco atual para arquivo temporário
+        temp_backup_path = os.path.join(tempfile.gettempdir(), backup_filename)
+        shutil.copy2('mikrotik_manager.db', temp_backup_path)
+        
+        return temp_backup_path, backup_filename
+        
+    except Exception as e:
+        return None, str(e)
+
+def restore_database_backup(backup_file_path):
+    """Restaura backup do banco de dados"""
+    try:
+        import shutil
+        
+        # Fazer backup do banco atual antes de restaurar
+        current_backup = f"mikrotik_manager_backup_before_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+        shutil.copy2('mikrotik_manager.db', current_backup)
+        
+        # Restaurar o backup
+        shutil.copy2(backup_file_path, 'mikrotik_manager.db')
+        
+        return True, f"Backup restaurado com sucesso. Backup anterior salvo como: {current_backup}"
+        
+    except Exception as e:
+        return False, f"Erro ao restaurar backup: {str(e)}"
+
 @app.route('/')
 def index():
     """Página inicial - redireciona para login ou dashboard"""
@@ -1857,6 +1894,68 @@ def settings():
 def uploaded_file(filename):
     """Servir arquivos de upload"""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/backup/download')
+@require_auth
+def download_backup():
+    """Download do backup do banco de dados"""
+    backup_path, backup_filename = create_database_backup()
+    
+    if backup_path:
+        try:
+            return send_from_directory(
+                os.path.dirname(backup_path), 
+                os.path.basename(backup_path),
+                as_attachment=True,
+                download_name=backup_filename
+            )
+        except Exception as e:
+            flash(f'Erro ao gerar backup: {str(e)}', 'error')
+            return redirect(url_for('settings'))
+    else:
+        flash(f'Erro ao criar backup: {backup_filename}', 'error')
+        return redirect(url_for('settings'))
+
+@app.route('/backup/restore', methods=['POST'])
+@require_auth
+def restore_backup():
+    """Restaurar backup do banco de dados"""
+    if 'backup_file' not in request.files:
+        flash('Nenhum arquivo selecionado', 'error')
+        return redirect(url_for('settings'))
+    
+    file = request.files['backup_file']
+    if file.filename == '':
+        flash('Nenhum arquivo selecionado', 'error')
+        return redirect(url_for('settings'))
+    
+    if file and file.filename.endswith('.db'):
+        try:
+            import tempfile
+            
+            # Salvar arquivo temporariamente
+            temp_path = os.path.join(tempfile.gettempdir(), secure_filename(file.filename))
+            file.save(temp_path)
+            
+            # Restaurar backup
+            success, message = restore_database_backup(temp_path)
+            
+            # Limpar arquivo temporário
+            os.remove(temp_path)
+            
+            if success:
+                flash(message, 'success')
+                # Reinicializar banco após restauração
+                init_db()
+            else:
+                flash(message, 'error')
+                
+        except Exception as e:
+            flash(f'Erro ao processar arquivo de backup: {str(e)}', 'error')
+    else:
+        flash('Arquivo deve ter extensão .db', 'error')
+    
+    return redirect(url_for('settings'))
 
 # API Routes
 @app.route('/api/health')
