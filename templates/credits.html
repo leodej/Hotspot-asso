@@ -1,13 +1,420 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotspot Manager Credits</title>
-</head>
-<body>
-    <h1>Hotspot Manager Credits</h1>
-    <p>Thank you to all the contributors who have made Hotspot Manager possible.</p>
-    <!-- /** rest of code here **/ -->
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Créditos - Hotspot Manager{% endblock %}
+
+{% block body %}
+<div class="container">
+  <aside class="sidebar">
+      <div class="logo">
+          <div class="logo-icon">MT</div>
+          <div class="logo-text">
+              <h2>Hotspot Manager</h2>
+              <p>Sistema de Gestão</p>
+          </div>
+      </div>
+
+      <nav>
+          <ul class="nav-menu">
+              <li class="nav-item">
+                  <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('users') }}" class="nav-link">Usuários</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('companies') }}" class="nav-link">Empresas</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('profiles') }}" class="nav-link">Perfis Hotspot</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('hotspot_users') }}" class="nav-link">Usuários Hotspot</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('credits') }}" class="nav-link active">Créditos</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('reports') }}" class="nav-link">Relatórios</a>
+              </li>
+              <li class="nav-item">
+                  <a href="{{ url_for('settings') }}" class="nav-link">Configurações</a>
+              </li>
+          </ul>
+      </nav>
+  </aside>
+
+  <main class="main-content">
+      <div class="header">
+          <div>
+              <h1>Gestão de Créditos</h1>
+              <p>Controle e monitoramento de créditos dos usuários</p>
+          </div>
+          <div class="user-info">
+              <span class="user-name">{{ user.name }}</span>
+              <a href="{{ url_for('logout') }}" class="logout-btn">Sair</a>
+          </div>
+      </div>
+
+      <style>
+          .filters-section {
+              background: white;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              padding: 1.5rem;
+              margin-bottom: 2rem;
+          }
+
+          .filters-title {
+              font-size: 1.125rem;
+              font-weight: 600;
+              color: #1f2937;
+              margin-bottom: 1rem;
+          }
+
+          .filters-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              gap: 1rem;
+              margin-bottom: 1rem;
+          }
+
+          .form-group {
+              margin-bottom: 0;
+          }
+
+          .form-label {
+              display: block;
+              margin-bottom: 0.5rem;
+              font-weight: 500;
+              font-size: 0.875rem;
+          }
+
+          .form-select {
+              width: 100%;
+              padding: 0.5rem;
+              border: 1px solid #d1d5db;
+              border-radius: 6px;
+              font-size: 0.875rem;
+          }
+
+          .btn-primary {
+              background: #3b82f6;
+              color: white;
+              padding: 0.5rem 1rem;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              text-decoration: none;
+              display: inline-block;
+          }
+
+          .btn-secondary {
+              background: #6b7280;
+              color: white;
+              padding: 0.5rem 1rem;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              text-decoration: none;
+              display: inline-block;
+          }
+
+          .stats-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+              gap: 1.5rem;
+              margin-bottom: 2rem;
+          }
+
+          .stat-card {
+              background: white;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              padding: 1.5rem;
+          }
+
+          .stat-header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-bottom: 1rem;
+          }
+
+          .stat-title {
+              font-size: 0.875rem;
+              font-weight: 500;
+              color: #6b7280;
+          }
+
+          .stat-icon {
+              width: 40px;
+              height: 40px;
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 1.25rem;
+              color: white;
+          }
+
+          .stat-value {
+              font-size: 2rem;
+              font-weight: bold;
+              color: #1f2937;
+              margin-bottom: 0.5rem;
+          }
+
+          .stat-change {
+              font-size: 0.875rem;
+              color: #6b7280;
+          }
+
+          .icon-total { background: #3b82f6; }
+          .icon-used { background: #ef4444; }
+          .icon-remaining { background: #10b981; }
+          .icon-users { background: #f59e0b; }
+
+          .credits-table {
+              background: white;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              overflow: hidden;
+          }
+
+          .table-header {
+              padding: 1.5rem;
+              border-bottom: 1px solid #e5e7eb;
+          }
+
+          .table-title {
+              font-size: 1.125rem;
+              font-weight: 600;
+              color: #1f2937;
+              margin-bottom: 0.5rem;
+          }
+
+          .table-description {
+              font-size: 0.875rem;
+              color: #6b7280;
+          }
+
+          .table {
+              width: 100%;
+              border-collapse: collapse;
+          }
+
+          .table th,
+          .table td {
+              padding: 1rem;
+              text-align: left;
+              border-bottom: 1px solid #e5e7eb;
+          }
+
+          .table th {
+              background: #f9fafb;
+              font-weight: 600;
+              color: #374151;
+              font-size: 0.875rem;
+          }
+
+          .table tr:hover {
+              background: #f9fafb;
+          }
+
+          .badge {
+              display: inline-block;
+              padding: 0.25rem 0.75rem;
+              border-radius: 9999px;
+              font-size: 0.75rem;
+              font-weight: 500;
+          }
+
+          .badge-success {
+              background: #dcfce7;
+              color: #166534;
+          }
+
+          .badge-warning {
+              background: #fef3c7;
+              color: #92400e;
+          }
+
+          .badge-danger {
+              background: #fee2e2;
+              color: #991b1b;
+          }
+
+          .progress-bar {
+              width: 100%;
+              height: 8px;
+              background: #e5e7eb;
+              border-radius: 4px;
+              overflow: hidden;
+          }
+
+          .progress-fill {
+              height: 100%;
+              background: #3b82f6;
+              transition: width 0.3s ease;
+          }
+      </style>
+
+      <!-- Filtros -->
+      <form method="GET" class="filters-section">
+          <h3 class="filters-title">Filtros</h3>
+          <div class="filters-grid">
+              <div class="form-group">
+                  <label class="form-label">Empresa</label>
+                  <select name="company" class="form-select">
+                      <option value="">Todas as empresas</option>
+                      {% for company in companies_list %}
+                      <option value="{{ company.id }}" {% if selected_company == company.id %}selected{% endif %}>
+                          {{ company.name }}
+                      </option>
+                      {% endfor %}
+                  </select>
+              </div>
+              <div class="form-group">
+                  <label class="form-label">Mês</label>
+                  <select name="month" class="form-select">
+                      <option value="">Todos os meses</option>
+                      {% for month in months_list %}
+                      <option value="{{ month.month_year }}" {% if selected_month == month.month_year %}selected{% endif %}>
+                          {% set year, month_num = month.month_year.split('-') %}
+                          {% set month_names = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'] %}
+                          {{ month_names[month_num|int] }} {{ year }}
+                      </option>
+                      {% endfor %}
+                  </select>
+              </div>
+          </div>
+          <button type="submit" class="btn-primary">Aplicar Filtros</button>
+          <a href="{{ url_for('credits') }}" class="btn-secondary" style="margin-left: 0.5rem;">Limpar Filtros</a>
+      </form>
+
+      <!-- Estatísticas -->
+      <div class="stats-grid">
+          <div class="stat-card">
+              <div class="stat-header">
+                  <div class="stat-title">Total de Créditos</div>
+                  <div class="stat-icon icon-total">💳</div>
+              </div>
+              <div class="stat-value">{{ "%.1f"|format(stats.total_credits_mb / 1024) }} GB</div>
+              <div class="stat-change">{{ stats.total_credits_mb }} MB</div>
+          </div>
+
+          <div class="stat-card">
+              <div class="stat-header">
+                  <div class="stat-title">Créditos Utilizados</div>
+                  <div class="stat-icon icon-used">📊</div>
+              </div>
+              <div class="stat-value">{{ "%.1f"|format(stats.used_credits_mb / 1024) }} GB</div>
+              <div class="stat-change">{{ stats.used_credits_mb }} MB</div>
+          </div>
+
+          <div class="stat-card">
+              <div class="stat-header">
+                  <div class="stat-title">Créditos Restantes</div>
+                  <div class="stat-icon icon-remaining">💰</div>
+              </div>
+              <div class="stat-value">{{ "%.1f"|format(stats.remaining_credits_mb / 1024) }} GB</div>
+              <div class="stat-change">{{ stats.remaining_credits_mb }} MB</div>
+          </div>
+
+          <div class="stat-card">
+              <div class="stat-header">
+                  <div class="stat-title">Usuários Ativos</div>
+                  <div class="stat-icon icon-users">👥</div>
+              </div>
+              <div class="stat-value">{{ stats.active_users }}</div>
+              <div class="stat-change">Com créditos ativos</div>
+          </div>
+      </div>
+
+      <!-- Tabela de Créditos -->
+      <div class="credits-table">
+          <div class="table-header">
+              <div class="table-title">
+                  Créditos por Usuário
+                  {% if selected_company or selected_month %}
+                      ({{ credits_list|length }} resultados encontrados)
+                  {% endif %}
+              </div>
+              <div class="table-description">Lista detalhada dos créditos de cada usuário</div>
+          </div>
+
+          <table class="table">
+              <thead>
+                  <tr>
+                      <th>Usuário</th>
+                      <th>Nome Completo</th>
+                      <th>Empresa</th>
+                      <th>Total (MB)</th>
+                      <th>Usado (MB)</th>
+                      <th>Restante (MB)</th>
+                      <th>Progresso</th>
+                      <th>Status</th>
+                      <th>Último Reset</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  {% for credit in credits_list %}
+                  <tr>
+                      <td>
+                          <div style="font-weight: 600;">{{ credit.username }}</div>
+                      </td>
+                      <td>{{ credit.full_name or '-' }}</td>
+                      <td>{{ credit.company_name }}</td>
+                      <td>{{ credit.total_mb or 0 }}</td>
+                      <td>{{ credit.used_mb or 0 }}</td>
+                      <td>{{ credit.remaining_mb or 0 }}</td>
+                      <td>
+                          {% if credit.total_mb and credit.total_mb > 0 %}
+                              {% set usage_percent = (credit.used_mb or 0) * 100 / credit.total_mb %}
+                              <div class="progress-bar">
+                                  <div class="progress-fill" style="width: {{ usage_percent }}%"></div>
+                              </div>
+                              <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">
+                                  {{ "%.1f"|format(usage_percent) }}%
+                              </div>
+                          {% else %}
+                              <div class="progress-bar">
+                                  <div class="progress-fill" style="width: 0%"></div>
+                              </div>
+                              <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">0%</div>
+                          {% endif %}
+                      </td>
+                      <td>
+                          {% if credit.remaining_mb and credit.remaining_mb > 0 %}
+                              <span class="badge badge-success">Ativo</span>
+                          {% elif credit.used_mb and credit.used_mb > 0 %}
+                              <span class="badge badge-warning">Esgotado</span>
+                          {% else %}
+                              <span class="badge badge-danger">Sem Uso</span>
+                          {% endif %}
+                      </td>
+                      <td>
+                          {% if credit.last_reset %}
+                              {{ credit.last_reset }}
+                          {% else %}
+                              -
+                          {% endif %}
+                      </td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                      <td colspan="9" style="text-align: center; padding: 2rem; color: #6b7280;">
+                          {% if selected_company or selected_month %}
+                              Nenhum crédito encontrado com os filtros aplicados
+                          {% else %}
+                              Nenhum crédito cadastrado no sistema
+                          {% endif %}
+                      </td>
+                  </tr>
+                  {% endfor %}
+              </tbody>
+          </table>
+      </div>
+  </main>
+</div>
+{% endblock %}
