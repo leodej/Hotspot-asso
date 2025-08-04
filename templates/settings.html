@@ -8,76 +8,58 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
-            background-color: #f8f9fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            font-family: Arial, sans-serif;
         }
         .sidebar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #2c3e50;
             min-height: 100vh;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            padding: 0;
         }
         .sidebar .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 12px 20px;
-            margin: 5px 15px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
+            color: #ecf0f1;
+            padding: 15px 20px;
+            border-bottom: 1px solid #34495e;
         }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active {
-            background-color: rgba(255,255,255,0.2);
+        .sidebar .nav-link:hover {
+            background-color: #34495e;
             color: white;
-            transform: translateX(5px);
+        }
+        .sidebar .nav-link.active {
+            background-color: #3498db;
+            color: white;
         }
         .main-content {
-            padding: 30px;
+            padding: 20px;
         }
         .card {
+            margin-bottom: 20px;
             border: none;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-            transition: transform 0.3s ease;
-        }
-        .card:hover {
-            transform: translateY(-5px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .card-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #3498db;
             color: white;
-            border-radius: 15px 15px 0 0 !important;
-            padding: 20px;
+            font-weight: bold;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 8px;
-            padding: 10px 25px;
-            transition: all 0.3s ease;
+            background-color: #3498db;
+            border-color: #3498db;
         }
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            background-color: #2980b9;
+            border-color: #2980b9;
         }
-        .form-control {
-            border-radius: 8px;
-            border: 2px solid #e9ecef;
-            padding: 12px 15px;
-            transition: all 0.3s ease;
+        .table {
+            background-color: white;
+        }
+        .table th {
+            background-color: #ecf0f1;
+            border-top: none;
         }
         .form-control:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-        .settings-section {
-            margin-bottom: 30px;
-        }
-        .logo-preview {
-            max-width: 200px;
-            max-height: 100px;
-            border: 2px dashed #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            background-color: #f8f9fa;
+            border-color: #3498db;
+            box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
         }
     </style>
 </head>
@@ -87,11 +69,8 @@
             <!-- Sidebar -->
             <div class="col-md-3 col-lg-2 px-0">
                 <div class="sidebar">
-                    <div class="text-center py-4">
-                        <h4 class="text-white">
-                            <i class="fas fa-wifi me-2"></i>
-                            Hotspot Manager
-                        </h4>
+                    <div class="text-center py-3">
+                        <h4 class="text-white">Hotspot Manager</h4>
                     </div>
                     <nav class="nav flex-column">
                         <a class="nav-link" href="/dashboard">
@@ -128,198 +107,172 @@
             <!-- Main Content -->
             <div class="col-md-9 col-lg-10">
                 <div class="main-content">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h2><i class="fas fa-cog me-2"></i> Configurações do Sistema</h2>
-                    </div>
+                    <h2 class="mb-4">Configurações do Sistema</h2>
 
                     <!-- Configurações Gerais -->
-                    <div class="settings-section">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0"><i class="fas fa-sliders-h me-2"></i> Configurações Gerais</h5>
-                            </div>
-                            <div class="card-body">
-                                <form id="generalSettingsForm">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="systemName" class="form-label">Nome do Sistema</label>
-                                                <input type="text" class="form-control" id="systemName" value="Hotspot Manager">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="companyName" class="form-label">Nome da Empresa</label>
-                                                <input type="text" class="form-control" id="companyName" placeholder="Digite o nome da empresa">
-                                            </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-cog me-2"></i> Configurações Gerais
+                        </div>
+                        <div class="card-body">
+                            <form>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="systemName" class="form-label">Nome do Sistema</label>
+                                            <input type="text" class="form-control" id="systemName" value="Hotspot Manager">
                                         </div>
                                     </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="timezone" class="form-label">Fuso Horário</label>
-                                                <select class="form-control" id="timezone">
-                                                    <option value="America/Sao_Paulo">América/São Paulo (UTC-3)</option>
-                                                    <option value="America/New_York">América/Nova York (UTC-5)</option>
-                                                    <option value="Europe/London">Europa/Londres (UTC+0)</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="language" class="form-label">Idioma</label>
-                                                <select class="form-control" id="language">
-                                                    <option value="pt-BR">Português (Brasil)</option>
-                                                    <option value="en-US">English (US)</option>
-                                                    <option value="es-ES">Español</option>
-                                                </select>
-                                            </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="companyName" class="form-label">Nome da Empresa</label>
+                                            <input type="text" class="form-control" id="companyName">
                                         </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-2"></i> Salvar Configurações
-                                    </button>
-                                </form>
-                            </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="timezone" class="form-label">Fuso Horário</label>
+                                            <select class="form-control" id="timezone">
+                                                <option>America/Sao_Paulo</option>
+                                                <option>America/New_York</option>
+                                                <option>Europe/London</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="language" class="form-label">Idioma</label>
+                                            <select class="form-control" id="language">
+                                                <option>Português (Brasil)</option>
+                                                <option>English (US)</option>
+                                                <option>Español</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Salvar</button>
+                            </form>
                         </div>
                     </div>
 
-                    <!-- Configurações de Branding -->
-                    <div class="settings-section">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0"><i class="fas fa-palette me-2"></i> Personalização Visual</h5>
-                            </div>
-                            <div class="card-body">
-                                <form id="brandingForm">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="logoUpload" class="form-label">Logo da Empresa</label>
-                                                <input type="file" class="form-control" id="logoUpload" accept="image/*">
-                                                <small class="form-text text-muted">Formatos aceitos: PNG, JPG, SVG (máx. 2MB)</small>
-                                            </div>
-                                            <div class="logo-preview" id="logoPreview">
-                                                <i class="fas fa-image fa-3x text-muted"></i>
-                                                <p class="mt-2 text-muted">Preview do Logo</p>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="primaryColor" class="form-label">Cor Primária</label>
-                                                <input type="color" class="form-control" id="primaryColor" value="#667eea">
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="secondaryColor" class="form-label">Cor Secundária</label>
-                                                <input type="color" class="form-control" id="secondaryColor" value="#764ba2">
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="theme" class="form-label">Tema</label>
-                                                <select class="form-control" id="theme">
-                                                    <option value="light">Claro</option>
-                                                    <option value="dark">Escuro</option>
-                                                    <option value="auto">Automático</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-2"></i> Salvar Personalização
-                                    </button>
-                                </form>
-                            </div>
+                    <!-- Configurações de E-mail -->
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-envelope me-2"></i> Configurações de E-mail
                         </div>
-                    </div>
-
-                    <!-- Configurações de Notificações -->
-                    <div class="settings-section">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0"><i class="fas fa-bell me-2"></i> Configurações de Notificações</h5>
-                            </div>
-                            <div class="card-body">
-                                <form id="notificationForm">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="emailNotifications" class="form-label">E-mail para Notificações</label>
-                                                <input type="email" class="form-control" id="emailNotifications" placeholder="admin@empresa.com">
-                                            </div>
-                                            <div class="form-check mb-3">
-                                                <input class="form-check-input" type="checkbox" id="enableEmailAlerts" checked>
-                                                <label class="form-check-label" for="enableEmailAlerts">
-                                                    Ativar alertas por e-mail
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-check mb-3">
-                                                <input class="form-check-input" type="checkbox" id="userLoginAlerts" checked>
-                                                <label class="form-check-label" for="userLoginAlerts">
-                                                    Alertas de login de usuários
-                                                </label>
-                                            </div>
-                                            <div class="form-check mb-3">
-                                                <input class="form-check-input" type="checkbox" id="systemAlerts" checked>
-                                                <label class="form-check-label" for="systemAlerts">
-                                                    Alertas do sistema
-                                                </label>
-                                            </div>
-                                            <div class="form-check mb-3">
-                                                <input class="form-check-input" type="checkbox" id="creditAlerts">
-                                                <label class="form-check-label" for="creditAlerts">
-                                                    Alertas de créditos baixos
-                                                </label>
-                                            </div>
+                        <div class="card-body">
+                            <form>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="smtpServer" class="form-label">Servidor SMTP</label>
+                                            <input type="text" class="form-control" id="smtpServer">
                                         </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-2"></i> Salvar Notificações
-                                    </button>
-                                </form>
-                            </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="smtpPort" class="form-label">Porta SMTP</label>
+                                            <input type="number" class="form-control" id="smtpPort" value="587">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="emailUser" class="form-label">Usuário</label>
+                                            <input type="email" class="form-control" id="emailUser">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="emailPassword" class="form-label">Senha</label>
+                                            <input type="password" class="form-control" id="emailPassword">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Salvar</button>
+                            </form>
                         </div>
                     </div>
 
                     <!-- Configurações de Backup -->
-                    <div class="settings-section">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0"><i class="fas fa-database me-2"></i> Backup e Restauração</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <h6>Backup Automático</h6>
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" id="autoBackup" checked>
-                                            <label class="form-check-label" for="autoBackup">
-                                                Ativar backup automático
-                                            </label>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="backupFrequency" class="form-label">Frequência</label>
-                                            <select class="form-control" id="backupFrequency">
-                                                <option value="daily">Diário</option>
-                                                <option value="weekly">Semanal</option>
-                                                <option value="monthly">Mensal</option>
-                                            </select>
-                                        </div>
-                                        <button type="button" class="btn btn-success" onclick="createBackup()">
-                                            <i class="fas fa-download me-2"></i> Criar Backup Agora
-                                        </button>
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-database me-2"></i> Backup
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5>Backup Automático</h5>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="autoBackup">
+                                        <label class="form-check-label" for="autoBackup">
+                                            Ativar backup automático
+                                        </label>
                                     </div>
-                                    <div class="col-md-6">
-                                        <h6>Restaurar Backup</h6>
-                                        <div class="mb-3">
-                                            <label for="backupFile" class="form-label">Arquivo de Backup</label>
-                                            <input type="file" class="form-control" id="backupFile" accept=".sql,.zip">
-                                        </div>
-                                        <button type="button" class="btn btn-warning" onclick="restoreBackup()">
-                                            <i class="fas fa-upload me-2"></i> Restaurar Backup
-                                        </button>
+                                    <div class="mb-3 mt-3">
+                                        <label for="backupFrequency" class="form-label">Frequência</label>
+                                        <select class="form-control" id="backupFrequency">
+                                            <option>Diário</option>
+                                            <option>Semanal</option>
+                                            <option>Mensal</option>
+                                        </select>
                                     </div>
                                 </div>
+                                <div class="col-md-6">
+                                    <h5>Backup Manual</h5>
+                                    <button type="button" class="btn btn-success mb-2">
+                                        <i class="fas fa-download me-2"></i> Criar Backup
+                                    </button>
+                                    <br>
+                                    <input type="file" class="form-control" accept=".sql">
+                                    <button type="button" class="btn btn-warning mt-2">
+                                        <i class="fas fa-upload me-2"></i> Restaurar Backup
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Logs do Sistema -->
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-file-alt me-2"></i> Logs do Sistema
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Data/Hora</th>
+                                            <th>Tipo</th>
+                                            <th>Usuário</th>
+                                            <th>Ação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>2024-01-15 10:30:00</td>
+                                            <td><span class="badge bg-info">INFO</span></td>
+                                            <td>admin</td>
+                                            <td>Login realizado</td>
+                                        </tr>
+                                        <tr>
+                                            <td>2024-01-15 10:25:00</td>
+                                            <td><span class="badge bg-success">SUCCESS</span></td>
+                                            <td>admin</td>
+                                            <td>Usuário criado: teste123</td>
+                                        </tr>
+                                        <tr>
+                                            <td>2024-01-15 10:20:00</td>
+                                            <td><span class="badge bg-warning">WARNING</span></td>
+                                            <td>system</td>
+                                            <td>Backup automático executado</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -329,49 +282,5 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Preview do logo
-        document.getElementById('logoUpload').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const preview = document.getElementById('logoPreview');
-                    preview.innerHTML = `<img src="${e.target.result}" alt="Logo Preview" style="max-width: 100%; max-height: 80px;">`;
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // Salvar configurações gerais
-        document.getElementById('generalSettingsForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            alert('Configurações gerais salvas com sucesso!');
-        });
-
-        // Salvar branding
-        document.getElementById('brandingForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            alert('Personalização visual salva com sucesso!');
-        });
-
-        // Salvar notificações
-        document.getElementById('notificationForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            alert('Configurações de notificações salvas com sucesso!');
-        });
-
-        // Criar backup
-        function createBackup() {
-            alert('Backup criado com sucesso!');
-        }
-
-        // Restaurar backup
-        function restoreBackup() {
-            if (confirm('Tem certeza que deseja restaurar o backup? Esta ação não pode ser desfeita.')) {
-                alert('Backup restaurado com sucesso!');
-            }
-        }
-    </script>
 </body>
 </html>
