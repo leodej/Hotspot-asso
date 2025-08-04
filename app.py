@@ -887,6 +887,14 @@ def schedule_daily_credit_sync():
     # Configurar timezone do Brasil
     brazil_tz = pytz.timezone('America/Sao_Paulo')
     
+    def run_credit_accumulation():
+        try:
+            print("🇧🇷 Executando acúmulo diário de créditos (23:58 Brasil)...")
+            update_credits_cumulative()
+            print("✅ Acúmulo de créditos concluído com sucesso!")
+        except Exception as e:
+            print(f"❌ Erro no acúmulo de créditos: {e}")
+    
     def run_sync():
         try:
             print("🇧🇷 Executando sincronização diária de créditos (00:00 Brasil)...")
@@ -894,10 +902,15 @@ def schedule_daily_credit_sync():
         except Exception as e:
             print(f"❌ Erro na sincronização diária: {e}")
     
-    # Agendar para executar todos os dias às 00:00 (horário do Brasil)
+    # Agendar acúmulo de créditos às 23:58 (2 minutos antes da sincronização)
+    schedule.every().day.at("23:58").do(run_credit_accumulation)
+    
+    # Agendar sincronização para MikroTik às 00:00 (horário do Brasil)
     schedule.every().day.at("00:00").do(run_sync)
     
-    print("📅 Agendamento diário configurado: Sincronização de créditos às 00:00 (Brasil)")
+    print("📅 Agendamentos diários configurados:")
+    print("   - Acúmulo de créditos: 23:58 (Brasil)")
+    print("   - Sincronização MikroTik: 00:00 (Brasil)")
     
     # Thread para executar o schedule
     def run_scheduler():
@@ -1905,5 +1918,6 @@ if __name__ == '__main__':
     print("🌐 URL: http://localhost:5000")
     print("💾 Banco: mikrotik_manager.db")
     print("📊 Coleta automática de uso: ATIVADA (a cada 1 minuto)")
+    print("💰 Acúmulo diário de créditos: ATIVADO (23:58 Brasil)")
     print("🇧🇷 Sincronização diária de créditos: ATIVADA (00:00 Brasil)")
     app.run(host='0.0.0.0', port=5000, debug=True)
