@@ -16,9 +16,15 @@ from threading import Timer
 import schedule
 from datetime import timezone
 import pytz
+import locale
+from datetime import timezone
 
 app = Flask(__name__)
 app.secret_key = 'mikrotik-manager-super-secret-key-2024'
+
+# Configurar timezone do sistema
+os.environ['TZ'] = 'America/Sao_Paulo'
+time.tzset()
 
 # Configurações
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
@@ -884,8 +890,9 @@ def sync_credits_to_mikrotik_total_bytes():
 def schedule_daily_credit_sync():
     """Agenda a sincronização diária de créditos às 00:00 (horário do Brasil)"""
     
-    # Configurar timezone do Brasil
-    brazil_tz = pytz.timezone('America/Sao_Paulo')
+    # Usar timezone do sistema
+    import time
+    time.tzset()
     
     def run_credit_accumulation():
         try:
