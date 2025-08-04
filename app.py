@@ -13,6 +13,9 @@ import time
 import re
 import threading
 from threading import Timer
+import schedule
+from datetime import timezone
+import pytz
 
 app = Flask(__name__)
 app.secret_key = 'mikrotik-manager-super-secret-key-2024'
@@ -787,79 +790,124 @@ def parse_mikrotik_users(output):
     
     return users
 
-def sync_hotspot_users_to_mikrotik(company_id):
-    """Sincroniza usuários hotspot com o MikroTik"""
+def sync_credits_to_mikrotik_total_bytes():
+    """Sincroniza créditos disponíveis com total-bytes no MikroTik"""
+    print("🔄 Iniciando sincronização de créditos para MikroTik...")
+    
     conn = get_db()
     
-    # Buscar dados da empresa
-    company = conn.execute('SELECT * FROM companies WHERE id = ?', (company_id,)).fetchone()
-    if not company:
-        return False, 'Empresa não encontrada'
+    # Buscar todas as empresas ativas
+    companies = conn.execute('SELECT * FROM companies WHERE active = 1').fetchall()
     
-    # Buscar usuários ativos da turma ativa com seus perfis
-    users = conn.execute('''
-        SELECT hu.*, hp.name as profile_name
-        FROM hotspot_users hu
-        LEFT JOIN hotspot_profiles hp ON hu.profile_id = hp.id
-        WHERE hu.company_id = ? AND hu.active = 1 AND hu.turma = ?
-    ''', (company_id, company['turma_ativa'])).fetchall()
+    total_synced = 0
+    total_errors = 0
+    
+    for company in companies:
+        try:
+            # Buscar usuários ativos da turma ativa com seus créditos
+            users_with_credits = conn.execute('''
+                SELECT hu.username, uc.remaining_mb
+                FROM hotspot_users hu
+                JOIN user_credits uc ON hu.id = uc.hotspot_user_id
+                WHERE hu.company_id = ? AND hu.active = 1 AND hu.turma = ?
+                AND uc.remaining_mb > 0
+            ''', (company['id'], company['turma_ativa'])).fetchall()
+            
+            if not users_with_credits:
+                continue
+            
+            # Conectar no MikroTik
+            start_time = time.time()
+            
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            ssh.connect(
+                hostname=company['mikrotik_ip'],
+                port=int(company['mikrotik_port']),
+                username=company['mikrotik_user'],
+                password=company['mikrotik_password'],
+                timeout=15
+            )
+            
+            company_synced = 0
+            
+            for user in users_with_credits:
+                try:
+                    # Converter MB para bytes (MikroTik usa bytes)
+                    total_bytes = int(user['remaining_mb'] * 1024 * 1024)
+                    
+                    # Comando para definir total-bytes do usuário
+                    command = f'/ip hotspot user set [find name="{user["username"]}"] bytes-total={total_bytes}'
+                    
+                    stdin, stdout, stderr = ssh.exec_command(command)
+                    error = stderr.read().decode('utf-8')
+                    
+                    if not error:
+                        company_synced += 1
+                        total_synced += 1
+                    else:
+                        print(f"❌ Erro ao sincronizar {user['username']}: {error}")
+                        total_errors += 1
+                        
+                except Exception as e:
+                    print(f"❌ Erro ao processar usuário {user['username']}: {e}")
+                    total_errors += 1
+            
+            ssh.close()
+            
+            response_time = time.time() - start_time
+            message = f'Sincronizados {company_synced} usuários com total-bytes'
+            
+            log_mikrotik_connection(
+                company['id'], 'sync_credits_to_bytes', 'success', 
+                message, response_time, company['mikrotik_ip'], company['mikrotik_port']
+            )
+            
+            print(f"✅ {company['name']}: {message}")
+            
+        except Exception as e:
+            error_message = f'Erro na sincronização de créditos: {str(e)}'
+            print(f"❌ {company['name']}: {error_message}")
+            
+            log_mikrotik_connection(
+                company['id'], 'sync_credits_to_bytes', 'failed', 
+                error_message, 0, company['mikrotik_ip'], company['mikrotik_port']
+            )
+            total_errors += 1
     
     conn.close()
     
-    start_time = time.time()
+    print(f"🎯 Sincronização concluída: {total_synced} sucessos, {total_errors} erros")
+    return total_synced, total_errors
+
+def schedule_daily_credit_sync():
+    """Agenda a sincronização diária de créditos às 00:00 (horário do Brasil)"""
     
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        ssh.connect(
-            hostname=company['mikrotik_ip'],
-            port=int(company['mikrotik_port']),
-            username=company['mikrotik_user'],
-            password=company['mikrotik_password'],
-            timeout=10
-        )
-        
-        synced_users = 0
-        
-        for user in users:
-            try:
-                # Usar o perfil do usuário ou "default" se não tiver perfil
-                profile_name = user['profile_name'] if user['profile_name'] else 'default'
-                
-                # Comando para adicionar/atualizar usuário no hotspot
-                command = f'/ip hotspot user add name="{user["username"]}" password="{user["password"]}" profile="{profile_name}"'
-                stdin, stdout, stderr = ssh.exec_command(command)
-                
-                error = stderr.read().decode('utf-8')
-                if not error or 'already exists' in error:
-                    synced_users += 1
-                    
-            except Exception as e:
-                print(f"Erro ao sincronizar usuário {user['username']}: {e}")
-        
-        ssh.close()
-        
-        response_time = time.time() - start_time
-        message = f'Sincronizados {synced_users} usuários com sucesso'
-        
-        log_mikrotik_connection(
-            company_id, 'sync_users', 'success', 
-            message, response_time, company['mikrotik_ip'], company['mikrotik_port']
-        )
-        
-        return True, message
-        
-    except Exception as e:
-        response_time = time.time() - start_time
-        error_message = f'Erro na sincronização: {str(e)}'
-        
-        log_mikrotik_connection(
-            company_id, 'sync_users', 'failed', 
-            error_message, response_time, company['mikrotik_ip'], company['mikrotik_port']
-        )
-        
-        return False, error_message
+    # Configurar timezone do Brasil
+    brazil_tz = pytz.timezone('America/Sao_Paulo')
+    
+    def run_sync():
+        try:
+            print("🇧🇷 Executando sincronização diária de créditos (00:00 Brasil)...")
+            sync_credits_to_mikrotik_total_bytes()
+        except Exception as e:
+            print(f"❌ Erro na sincronização diária: {e}")
+    
+    # Agendar para executar todos os dias às 00:00 (horário do Brasil)
+    schedule.every().day.at("00:00").do(run_sync)
+    
+    print("📅 Agendamento diário configurado: Sincronização de créditos às 00:00 (Brasil)")
+    
+    # Thread para executar o schedule
+    def run_scheduler():
+        while True:
+            # Verificar se há tarefas agendadas para executar
+            schedule.run_pending()
+            time.sleep(60)  # Verificar a cada minuto
+    
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
 
 def update_credits_cumulative():
     """Atualiza créditos cumulativos diariamente"""
@@ -1542,7 +1590,7 @@ def credits():
             COUNT(DISTINCT hu.id) as active_users
         FROM user_credits uc
         JOIN hotspot_users hu ON uc.hotspot_user_id = hu.id
-        JOIN companies c ON hu.company_id = c.id
+        JOIN companies c ON hu.company_id = hu.company_id
         WHERE hu.active = 1
     '''
     
@@ -1827,11 +1875,29 @@ def api_update_credits():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
+@app.route('/api/sync-credits-to-mikrotik', methods=['POST'])
+@require_auth
+def api_sync_credits_to_mikrotik():
+    """API para sincronizar créditos com MikroTik manualmente"""
+    try:
+        synced, errors = sync_credits_to_mikrotik_total_bytes()
+        return jsonify({
+            'status': 'success', 
+            'message': f'Sincronização concluída: {synced} sucessos, {errors} erros',
+            'synced': synced,
+            'errors': errors
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
 if __name__ == '__main__':
     init_db()
     
     # Iniciar coleta automática de uso
     schedule_usage_collection()
+    
+    # Iniciar agendamento diário de sincronização de créditos
+    schedule_daily_credit_sync()
     
     print("🚀 Iniciando MikroTik Manager Flask...")
     print("📧 Login: admin@demo.com")
@@ -1839,4 +1905,5 @@ if __name__ == '__main__':
     print("🌐 URL: http://localhost:5000")
     print("💾 Banco: mikrotik_manager.db")
     print("📊 Coleta automática de uso: ATIVADA (a cada 1 minuto)")
+    print("🇧🇷 Sincronização diária de créditos: ATIVADA (00:00 Brasil)")
     app.run(host='0.0.0.0', port=5000, debug=True)
