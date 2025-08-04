@@ -416,6 +416,25 @@
                 </div>
                 <div class="card-content">
                     <div class="form-group">
+                        <label class="form-label">Backup Completo do Sistema</label>
+                        <a href="{{ url_for('download_backup') }}" class="btn-save" style="display: inline-block; text-decoration: none; text-align: center; margin-bottom: 1rem;">
+            💾 Baixar Backup Completo
+        </a>
+                        <div class="help-text">Baixa uma cópia completa do banco de dados do sistema</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Restaurar Backup</label>
+                        <form method="POST" action="{{ url_for('restore_backup') }}" enctype="multipart/form-data" style="margin-bottom: 1rem;">
+                            <input type="file" name="backup_file" accept=".db" class="form-input" style="margin-bottom: 0.5rem;" required>
+                            <button type="submit" class="btn-save" onclick="return confirm('⚠️ ATENÇÃO: Esta operação irá substituir todos os dados atuais do sistema. Um backup automático será criado antes da restauração. Deseja continuar?')">
+                🔄 Restaurar Backup
+            </button>
+                        </form>
+                        <div class="help-text">⚠️ CUIDADO: Restaurar um backup substitui todos os dados atuais. Um backup automático será criado antes da operação.</div>
+                    </div>
+                    
+                    <div class="form-group">
                         <label class="form-label">Backup Automático</label>
                         <select class="form-select">
                             <option>Diário</option>
@@ -433,7 +452,6 @@
                             <label>Backup automático ativado</label>
                         </div>
                     </div>
-                    <button class="btn-save">Fazer Backup Agora</button>
                 </div>
             </div>
         </div>
